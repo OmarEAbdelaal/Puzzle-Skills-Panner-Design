@@ -133,9 +133,11 @@ class MainActivity : AppCompatActivity() {
             setSupportZoom(true)
             mediaPlaybackRequiresUserGesture = false
             cacheMode = WebSettings.LOAD_DEFAULT
-            // Everything the page needs ships inside the APK.
+            // Everything the page needs ships inside the APK, so file:// access
+            // stays off. content:// stays on: it is how images the user picks
+            // from the gallery reach the page.
             allowFileAccess = false
-            allowContentAccess = false
+            allowContentAccess = true
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
         }
         webView.overScrollMode = View.OVER_SCROLL_NEVER

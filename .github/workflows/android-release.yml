@@ -41,6 +41,7 @@ jobs:
   build:
     name: Build and publish APK
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Check out the project
@@ -54,6 +55,15 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      # Which SDK the runner already has decides whether Gradle has to go
+      # and fetch one, which is by far the slowest thing that can happen here.
+      - name: Show the Android SDK on this runner
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME:-<unset>}"
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-<unset>}"
+          ls "${ANDROID_HOME:-/usr/local/lib/android/sdk}/platforms" 2>/dev/null || echo "no platforms dir"
+          ls "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" 2>/dev/null || echo "no build-tools dir"
 
       # ── Version ──────────────────────────────────────────────
       # A tag is the source of truth. versionCode has to increase
