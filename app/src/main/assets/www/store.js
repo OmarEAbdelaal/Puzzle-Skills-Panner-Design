@@ -123,14 +123,22 @@
    * project eventually reclaims its photos too.
    */
   function collectGarbage() {
-    var live = Object.create(null);
+    var live = Object.create(null);      // image ids whose pixels we hold here
+    var liveSrcs = Object.create(null);  // app-served URLs the native side holds
     var mark = function (st) {
       if (st && Array.isArray(st.images)) {
-        st.images.forEach(function (i) { if (i && i.id) live[i.id] = true; });
+        st.images.forEach(function (i) {
+          if (!i) return;
+          if (i.id) live[i.id] = true;
+          if (typeof i.src === 'string' && i.src.indexOf('/picked/') >= 0) {
+            liveSrcs[i.src] = true;
+          }
+        });
       }
     };
     history.past.forEach(function (h) { mark(h.state); });
     history.future.forEach(function (h) { mark(h.state); });
+    mark(snapshot());                    // the project open right now
 
     return allKeys(STORE).then(function (keys) {
       return Promise.all((keys || []).map(function (k) {
@@ -139,6 +147,13 @@
     }).then(function () {
       return tx(BLOBS, 'readonly', function (os) { return os.getAllKeys(); });
     }).then(function (blobKeys) {
+      // Photos the app stored as files are cleaned up by the native side,
+      // which is the only thing that can delete them.
+      if (window.PannerNative && window.PannerNative.retainImages) {
+        try {
+          window.PannerNative.retainImages(JSON.stringify(Object.keys(liveSrcs)));
+        } catch (e) { console.warn('retain failed', e); }
+      }
       var dead = (blobKeys || []).filter(function (k) { return !live[k]; });
       dead.forEach(function (k) { delete srcCache[k]; });
       return Promise.all(dead.map(function (k) { return del(BLOBS, k); }));

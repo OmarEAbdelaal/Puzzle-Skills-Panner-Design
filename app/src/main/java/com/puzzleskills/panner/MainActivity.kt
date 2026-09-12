@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
+import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
@@ -22,7 +23,6 @@ import android.webkit.WebViewClient
 import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
@@ -45,11 +45,20 @@ import java.util.concurrent.Executors
  */
 class MainActivity : AppCompatActivity() {
 
-    private companion object {
+    companion object {
         const val APP_HOST = "appassets.androidplatform.net"
         const val START_URL = "https://$APP_HOST/assets/www/index.html"
         const val JS_INTERFACE = "PannerNative"
         const val MAX_PICK = 30
+
+        /**
+         * Named explicitly rather than relying on "image/*": some providers
+         * filter on the concrete type, and PNG and JPEG are what matters here.
+         */
+        val IMAGE_MIME_TYPES = arrayOf(
+            "image/png", "image/jpeg", "image/jpg", "image/webp",
+            "image/gif", "image/bmp", "image/heic", "image/heif", "image/*"
+        )
     }
 
     private lateinit var webView: WebView
@@ -73,13 +82,22 @@ class MainActivity : AppCompatActivity() {
     private val io = Executors.newSingleThreadExecutor()
 
     /**
-     * Android's photo picker. Used instead of the page's <input type="file">,
-     * which frequently fails to open a chooser inside a WebView, and which
-     * would hand us full-size photos the layout engine cannot afford.
+     * The system document picker, opened with PNG and JPEG named explicitly.
+     *
+     * This replaced Android's visual photo picker, which only lists media the
+     * MediaStore has indexed — so images sitting in Downloads, a WhatsApp
+     * folder, or anything copied over from a computer simply were not offered,
+     * which is what "it won't accept my image" looked like. The document
+     * picker browses everything, gallery apps included.
      */
+    private val documentPicker = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result -> ingestPickedPhotos(urisFrom(result.resultCode, result.data)) }
+
+    /** Android's visual photo picker, offered as the gallery-shaped alternative. */
     private val photoPicker = registerForActivityResult(
-        ActivityResultContracts.PickMultipleVisualMedia(MAX_PICK)
-    ) { uris -> ingestPickedPhotos(uris) }
+        ActivityResultContracts.StartActivityForResult()
+    ) { result -> ingestPickedPhotos(urisFrom(result.resultCode, result.data)) }
 
     /* ── Lifecycle ────────────────────────────────────────── */
 
@@ -139,6 +157,7 @@ class MainActivity : AppCompatActivity() {
         val assetLoader = WebViewAssetLoader.Builder()
             .setDomain(APP_HOST)
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .addPathHandler(PickedImages.PATH, PickedImages.Handler(applicationContext))
             .build()
 
         webView.settings.apply {
@@ -316,10 +335,65 @@ class MainActivity : AppCompatActivity() {
 
     /* ── Photo intake ─────────────────────────────────────── */
 
+    /** A chooser result is either one URI on the data, or a ClipData of many. */
+    private fun urisFrom(resultCode: Int, data: Intent?): List<Uri> {
+        if (resultCode != RESULT_OK || data == null) return emptyList()
+        val clip = data.clipData
+        if (clip != null) {
+            return (0 until clip.itemCount).mapNotNull { clip.getItemAt(it)?.uri }
+        }
+        return listOfNotNull(data.data)
+    }
+
     /**
-     * Decodes the picked photos one at a time and pushes each into the page as
-     * it is ready. One at a time matters: a batch of 30 photos as a single
-     * JSON string would be tens of megabytes crossing the JS bridge at once.
+     * Opens a picker. Each option is tried in turn so that an unusual device,
+     * or a ROM missing one of these activities, still ends up with something.
+     */
+    private fun launchPicker(preferGallery: Boolean) {
+        val attempts = if (preferGallery) {
+            listOf(::galleryIntent, ::openDocumentIntent, ::getContentIntent)
+        } else {
+            listOf(::openDocumentIntent, ::getContentIntent, ::galleryIntent)
+        }
+        for (build in attempts) {
+            try {
+                val intent = build()
+                if (preferGallery) photoPicker.launch(intent) else documentPicker.launch(intent)
+                return
+            } catch (e: Exception) {
+                Log.w("Panner", "picker attempt failed", e)
+            }
+        }
+        callJs("onPickFailed", getString(R.string.no_gallery_app))
+    }
+
+    private fun openDocumentIntent() = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+        addCategory(Intent.CATEGORY_OPENABLE)
+        type = "image/*"
+        putExtra(Intent.EXTRA_MIME_TYPES, IMAGE_MIME_TYPES)
+        putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+
+    private fun getContentIntent() = Intent(Intent.ACTION_GET_CONTENT).apply {
+        addCategory(Intent.CATEGORY_OPENABLE)
+        type = "image/*"
+        putExtra(Intent.EXTRA_MIME_TYPES, IMAGE_MIME_TYPES)
+        putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+    }
+
+    private fun galleryIntent() = Intent(Intent.ACTION_PICK).apply {
+        setDataAndType(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*")
+        putExtra(Intent.EXTRA_MIME_TYPES, IMAGE_MIME_TYPES)
+        putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+    }
+
+    /**
+     * Stores each picked photo and tells the page where to find it, one at a
+     * time so a large selection never builds one enormous payload.
+     *
+     * The page is told how many failed as well as how many worked — a photo
+     * that cannot be decoded should say so, not vanish.
      */
     private fun ingestPickedPhotos(uris: List<Uri>) {
         if (uris.isEmpty()) {
@@ -328,14 +402,17 @@ class MainActivity : AppCompatActivity() {
         }
         io.execute {
             var ok = 0
-            for (uri in uris) {
-                val entry = ImageIntake.load(applicationContext, uri)
+            var failed = 0
+            for (uri in uris.take(MAX_PICK)) {
+                val entry = PickedImages.save(applicationContext, uri)
                 if (entry != null) {
                     callJs("onImagePicked", entry.toString())
                     ok++
+                } else {
+                    failed++
                 }
             }
-            callJs("onPickDone", ok.toString())
+            callJs("onPickDone", JSONObject().put("ok", ok).put("failed", failed).toString())
         }
     }
 
@@ -379,16 +456,18 @@ class MainActivity : AppCompatActivity() {
             keepAwake(false)
         }
 
-        /** Opens the system photo picker. */
+        /** Opens the file browser, which can reach PNG and JPEG anywhere. */
         @JavascriptInterface
-        fun pickImages() = runOnUiThread {
-            try {
-                photoPicker.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                )
-            } catch (e: ActivityNotFoundException) {
-                callJs("onPickFailed", getString(R.string.no_gallery_app))
-            }
+        fun pickImages() = runOnUiThread { launchPicker(preferGallery = false) }
+
+        /** Opens the gallery instead, for photos rather than files. */
+        @JavascriptInterface
+        fun pickImagesFromGallery() = runOnUiThread { launchPicker(preferGallery = true) }
+
+        /** Drops stored photos the page no longer refers to. */
+        @JavascriptInterface
+        fun retainImages(srcsJson: String) {
+            io.execute { PickedImages.retainOnly(applicationContext, srcsJson) }
         }
 
         /* Updates */

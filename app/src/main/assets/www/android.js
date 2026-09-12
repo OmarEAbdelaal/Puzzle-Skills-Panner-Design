@@ -173,19 +173,68 @@
     target.addEventListener('click', function (e) {
       e.preventDefault();
       e.stopPropagation();
-      toast('جارٍ فتح معرض الصور…', 1400);
-      safe(function () { N.pickImages(); });
+      openSourceChooser();
     }, true);
   }
 
   /*
-   * Photos arrive one at a time rather than as one batch — thirty photos in a
-   * single JSON string would be tens of megabytes crossing the bridge at once.
-   * The first one records an undo point; the rest join the same entry.
+   * Two ways in, because they reach different places:
+   *   • Files   — the system document browser. Sees PNG and JPEG anywhere,
+   *               including Downloads and WhatsApp folders.
+   *   • Gallery — the photo app, for things that are actually photos.
+   * The gallery alone was the original mistake: it only lists media the
+   * MediaStore has indexed, so images copied onto the phone never showed up.
+   */
+  function openSourceChooser() {
+    var backdropEl = document.createElement('div');
+    backdropEl.className = 'sheet-backdrop open';
+
+    var sheetEl = document.createElement('div');
+    sheetEl.className = 'app-sheet open';
+    sheetEl.innerHTML =
+      '<div class="grip"></div>' +
+      '<h3>إضافة صور</h3>' +
+      '<p class="sub">PNG و JPG وغيرها</p>' +
+      '<button class="sheet-item accent" id="srcFiles">' +
+        '<span class="ico">📁</span><span class="txt">الملفات' +
+        '<small>تصفّح كل مجلدات الهاتف — التنزيلات، واتساب، بطاقة الذاكرة</small>' +
+        '</span></button>' +
+      '<button class="sheet-item" id="srcGallery">' +
+        '<span class="ico">🖼️</span><span class="txt">معرض الصور' +
+        '<small>الصور الملتقطة بالكاميرا</small></span></button>';
+
+    var close = function () {
+      backdropEl.remove();
+      sheetEl.remove();
+    };
+    backdropEl.addEventListener('click', close);
+    document.body.appendChild(backdropEl);
+    document.body.appendChild(sheetEl);
+
+    sheetEl.querySelector('#srcFiles').addEventListener('click', function () {
+      close();
+      toast('جارٍ فتح الملفات…', 1400);
+      safe(function () { N.pickImages(); });
+    });
+    sheetEl.querySelector('#srcGallery').addEventListener('click', function () {
+      close();
+      toast('جارٍ فتح معرض الصور…', 1400);
+      safe(function () {
+        if (N.pickImagesFromGallery) N.pickImagesFromGallery();
+        else N.pickImages();
+      });
+    });
+  }
+
+  /*
+   * Photos arrive one at a time. Each is a short URL served by the app itself,
+   * not a base64 blob — a megabyte-long string per photo through
+   * evaluateJavascript was unreliable, and when it failed the photo just never
+   * appeared. The first one records an undo point; the rest join that entry.
    */
   var pickBatch = 0;
 
-  /** @param json one image: {src: dataUrl, w, h, name} */
+  /** @param json one image: {src, w, h, name} */
   Host.onImagePicked = function (json) {
     var item = safe(function () { return JSON.parse(json); }, null);
     var A = window.PannerApp;
@@ -196,21 +245,25 @@
     pickBatch += A.addImages([item]);
   };
 
-  /** @param countStr how many the native side managed to decode */
-  Host.onPickDone = function (countStr) {
-    var n = pickBatch;
+  /** @param json {ok, failed} — how the native side actually got on */
+  Host.onPickDone = function (json) {
+    var r = safe(function () { return JSON.parse(json); }, null) || {};
+    var added = pickBatch;
     pickBatch = 0;
-    var attempted = parseInt(countStr, 10) || 0;
     if (window.PannerStore) window.PannerStore.scheduleSave();
-    if (!n) {
-      toast(attempted ? 'تعذّرت قراءة الصور المختارة' : 'لم يتم اختيار صور');
+
+    if (!added) {
+      toast(r.failed ? 'تعذّرت قراءة الصور المختارة — جرّب صيغة PNG أو JPG'
+                     : 'لم يتم اختيار صور');
       return;
     }
-    toast(n === 1 ? '✔ تمت إضافة صورة' : '✔ تمت إضافة ' + n + ' صور');
+    var msg = added === 1 ? '✔ تمت إضافة صورة' : '✔ تمت إضافة ' + added + ' صور';
+    if (r.failed) msg += ' · تعذّرت ' + r.failed;
+    toast(msg);
   };
 
   Host.onPickFailed = function (msg) {
-    toast(msg || 'تعذّر فتح معرض الصور');
+    toast(msg || 'تعذّر فتح منتقي الصور');
   };
 
   /* ─────────────────────────────────────────────────────────
