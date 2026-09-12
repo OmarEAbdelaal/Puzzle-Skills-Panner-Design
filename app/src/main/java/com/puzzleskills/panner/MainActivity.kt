@@ -10,6 +10,7 @@ import android.provider.MediaStore
 import android.view.View
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
+import android.webkit.JsPromptResult
 import android.webkit.JsResult
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -18,8 +19,10 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
@@ -28,6 +31,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.WebViewAssetLoader
 import org.json.JSONObject
 import java.io.File
+import java.util.concurrent.Executors
 
 /**
  * The whole app: one WebView running the Puzzle Skills banner designer
@@ -45,6 +49,7 @@ class MainActivity : AppCompatActivity() {
         const val APP_HOST = "appassets.androidplatform.net"
         const val START_URL = "https://$APP_HOST/assets/www/index.html"
         const val JS_INTERFACE = "PannerNative"
+        const val MAX_PICK = 30
     }
 
     private lateinit var webView: WebView
@@ -63,6 +68,18 @@ class MainActivity : AppCompatActivity() {
             WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data)
         )
     }
+
+    /** Off the main thread: decoding and re-encoding photos is slow. */
+    private val io = Executors.newSingleThreadExecutor()
+
+    /**
+     * Android's photo picker. Used instead of the page's <input type="file">,
+     * which frequently fails to open a chooser inside a WebView, and which
+     * would hand us full-size photos the layout engine cannot afford.
+     */
+    private val photoPicker = registerForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(MAX_PICK)
+    ) { uris -> ingestPickedPhotos(uris) }
 
     /* ── Lifecycle ────────────────────────────────────────── */
 
@@ -100,6 +117,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        io.shutdownNow()
         updates.dispose()
         exports.abort()
         webView.destroy()
@@ -128,9 +146,12 @@ class MainActivity : AppCompatActivity() {
             domStorageEnabled = true              // the manual layout is kept in localStorage
             loadWithOverviewMode = true
             useWideViewPort = true
-            builtInZoomControls = true            // pinch to zoom the banner
+            // The page implements its own pan/zoom (gestures.js) so that one
+            // finger can move an image while two fingers move the canvas.
+            // WebView's own pinch zoom would fight it for the same touches.
+            builtInZoomControls = false
             displayZoomControls = false
-            setSupportZoom(true)
+            setSupportZoom(false)
             mediaPlaybackRequiresUserGesture = false
             cacheMode = WebSettings.LOAD_DEFAULT
             // Everything the page needs ships inside the APK, so file:// access
@@ -184,7 +205,27 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
 
-            /** Backs the "add images" button in the page. */
+            override fun onJsPrompt(
+                view: WebView?, url: String?, message: String?,
+                defaultValue: String?, result: JsPromptResult?
+            ): Boolean {
+                val field = EditText(this@MainActivity).apply {
+                    setText(defaultValue.orEmpty())
+                    setSelection(text.length)
+                }
+                AlertDialog.Builder(this@MainActivity)
+                    .setMessage(message)
+                    .setView(field)
+                    .setPositiveButton(android.R.string.ok) { _, _ ->
+                        result?.confirm(field.text.toString())
+                    }
+                    .setNegativeButton(android.R.string.cancel) { _, _ -> result?.cancel() }
+                    .setOnCancelListener { result?.cancel() }
+                    .show()
+                return true
+            }
+
+            /** Browser fallback for "add images"; the app uses pickImages(). */
             override fun onShowFileChooser(
                 view: WebView?,
                 callback: ValueCallback<Array<Uri>>?,
@@ -273,6 +314,31 @@ class MainActivity : AppCompatActivity() {
         else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
+    /* ── Photo intake ─────────────────────────────────────── */
+
+    /**
+     * Decodes the picked photos one at a time and pushes each into the page as
+     * it is ready. One at a time matters: a batch of 30 photos as a single
+     * JSON string would be tens of megabytes crossing the JS bridge at once.
+     */
+    private fun ingestPickedPhotos(uris: List<Uri>) {
+        if (uris.isEmpty()) {
+            callJs("onPickFailed", getString(R.string.no_images_picked))
+            return
+        }
+        io.execute {
+            var ok = 0
+            for (uri in uris) {
+                val entry = ImageIntake.load(applicationContext, uri)
+                if (entry != null) {
+                    callJs("onImagePicked", entry.toString())
+                    ok++
+                }
+            }
+            callJs("onPickDone", ok.toString())
+        }
+    }
+
     /* ── The JavaScript interface ─────────────────────────── */
 
     /**
@@ -311,6 +377,18 @@ class MainActivity : AppCompatActivity() {
         fun abortSave() {
             exports.abort()
             keepAwake(false)
+        }
+
+        /** Opens the system photo picker. */
+        @JavascriptInterface
+        fun pickImages() = runOnUiThread {
+            try {
+                photoPicker.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            } catch (e: ActivityNotFoundException) {
+                callJs("onPickFailed", getString(R.string.no_gallery_app))
+            }
         }
 
         /* Updates */

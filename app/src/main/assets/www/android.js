@@ -148,53 +148,79 @@
     });
   }
 
+
   /* ─────────────────────────────────────────────────────────
-     3. Zoom dock — pinch is native, these are the precise controls
+     3. Adding photos
+
+     A hidden <input type="file"> inside a <label> is unreliable in a
+     WebView — the chooser often never opens. Inside the app we bypass
+     the input entirely and call Android's photo picker, which also lets
+     the native side downscale each photo before handing it over. In a
+     browser the original input still does the job.
      ───────────────────────────────────────────────────────── */
-  var zoom = 1;
-  function applyZoom() {
-    var outer = el('sheetOuter');
-    if (outer) outer.style.transform = 'scale(' + zoom + ')';
-    var lbl = el('zoomLevel');
-    if (lbl) lbl.textContent = Math.round(zoom * 100) + '%';
-  }
-  function setZoom(z) {
-    zoom = Math.min(3, Math.max(0.2, Math.round(z * 20) / 20));
-    applyZoom();
-  }
-  function fitToScreen() {
-    var outer = el('sheetOuter'), stage = document.querySelector('.stage');
-    if (!outer || !stage) return;
-    var prev = outer.style.transform;
-    outer.style.transform = 'none';
-    var w = outer.offsetWidth, h = outer.offsetHeight;
-    outer.style.transform = prev;
-    if (!w || !h) return;
-    var availW = stage.clientWidth - 24;
-    var availH = stage.clientHeight - 24;
-    setZoom(Math.min(availW / w, availH / h, 1));
+
+  function wireNativePicker() {
+    if (!N.pickImages) return;
+
+    var input = el('fileInput');
+    var label = input ? input.closest('label') : null;
+    var target = label || document.querySelector('.add-btn');
+    if (!target) return;
+
+    // Stop the label from trying to open the (unreliable) file input at all.
+    if (input) input.disabled = true;
+
+    target.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      toast('جارٍ فتح معرض الصور…', 1400);
+      safe(function () { N.pickImages(); });
+    }, true);
   }
 
-  function buildZoomDock() {
-    var dock = document.createElement('div');
-    dock.className = 'zoom-dock';
-    dock.innerHTML =
-      '<button id="zoomIn"  title="تكبير"  aria-label="تكبير">＋</button>' +
-      '<button id="zoomLevel" class="zoom-level" title="اضغط للملاءمة">100%</button>' +
-      '<button id="zoomOut" title="تصغير" aria-label="تصغير">－</button>';
-    document.body.appendChild(dock);
-    el('zoomIn').addEventListener('click', function () { setZoom(zoom + 0.1); });
-    el('zoomOut').addEventListener('click', function () { setZoom(zoom - 0.1); });
-    el('zoomLevel').addEventListener('click', fitToScreen);
-  }
+  /*
+   * Photos arrive one at a time rather than as one batch — thirty photos in a
+   * single JSON string would be tens of megabytes crossing the bridge at once.
+   * The first one records an undo point; the rest join the same entry.
+   */
+  var pickBatch = 0;
+
+  /** @param json one image: {src: dataUrl, w, h, name} */
+  Host.onImagePicked = function (json) {
+    var item = safe(function () { return JSON.parse(json); }, null);
+    var A = window.PannerApp;
+    if (!item || !A) return;
+    if (pickBatch === 0 && window.PannerStore) {
+      window.PannerStore.pushHistory('إضافة صور');
+    }
+    pickBatch += A.addImages([item]);
+  };
+
+  /** @param countStr how many the native side managed to decode */
+  Host.onPickDone = function (countStr) {
+    var n = pickBatch;
+    pickBatch = 0;
+    var attempted = parseInt(countStr, 10) || 0;
+    if (window.PannerStore) window.PannerStore.scheduleSave();
+    if (!n) {
+      toast(attempted ? 'تعذّرت قراءة الصور المختارة' : 'لم يتم اختيار صور');
+      return;
+    }
+    toast(n === 1 ? '✔ تمت إضافة صورة' : '✔ تمت إضافة ' + n + ' صور');
+  };
+
+  Host.onPickFailed = function (msg) {
+    toast(msg || 'تعذّر فتح معرض الصور');
+  };
 
   /* ─────────────────────────────────────────────────────────
-     4. App menu (bottom sheet): updates, exports, layout reset
+     4. App menu (bottom sheet): projects, updates, exports
      ───────────────────────────────────────────────────────── */
   var backdrop, sheet, pendingUpdate = null;
 
   function openSheet() {
     refreshSheet();
+    renderProjects();
     backdrop.classList.add('open');
     sheet.classList.add('open');
   }
@@ -227,6 +253,10 @@
       '<div class="grip"></div>' +
       '<h3>Puzzle Skills · تصميم بانر الجوخ</h3>' +
       '<p class="sub">تصميم: إسراء عبد الظاهر</p>' +
+      '<button class="sheet-item accent" id="miSaveProject">' +
+        '<span class="ico">💾</span><span class="txt">حفظ نسخة باسم' +
+        '<small>احتفظ بالتصميم الحالي لتفتحه لاحقاً</small></span></button>' +
+      '<div id="projList" class="proj-list"></div>' +
       '<button class="sheet-item" id="miUpdate">' +
         '<span class="ico">⬆️</span><span class="txt">التحقق من التحديثات' +
         '<small id="miUpdateSub">الإصدار الحالي —</small></span></button>' +
@@ -262,14 +292,95 @@
       safe(function () { N.shareLastExport(); });
     });
     el('miResetLayout').addEventListener('click', function () {
+      var A = window.PannerApp;
+      if (window.PannerStore) window.PannerStore.pushHistory('إعادة ضبط');
       safe(function () { localStorage.removeItem('felt-banner-manual-v6'); });
+      if (A) A.enterManual();
+      if (window.PannerStore) window.PannerStore.flush();
       closeSheet();
-      toast('تمت إعادة الضبط — سيُعاد تشغيل التطبيق');
-      setTimeout(function () { location.reload(); }, 700);
+      toast('تمت إعادة التوزيع التلقائي — يمكنك التراجع بـ ↶');
     });
+
+    el('miSaveProject').addEventListener('click', saveProjectFlow);
     el('miRepo').addEventListener('click', function () {
       closeSheet();
       safe(function () { N.openRepo(); });
+    });
+  }
+
+
+  /* ── Saved projects ───────────────────────────────────────── */
+
+  function defaultProjectName() {
+    var d = new Date();
+    var two = function (n) { return (n < 10 ? '0' : '') + n; };
+    return 'بانر ' + d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()) +
+           ' ' + two(d.getHours()) + two(d.getMinutes());
+  }
+
+  function saveProjectFlow() {
+    if (!window.PannerStore) return;
+    var name = prompt('اسم النسخة المحفوظة:', defaultProjectName());
+    if (name === null) return;
+    name = String(name).trim().slice(0, 60);
+    if (!name) return;
+    window.PannerStore.saveProject(name).then(function (ok) {
+      toast(ok ? '✔ تم حفظ «' + name + '»' : 'تعذّر الحفظ');
+      renderProjects();
+    });
+  }
+
+  function formatWhen(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    var two = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()) +
+           ' · ' + two(d.getHours()) + ':' + two(d.getMinutes());
+  }
+
+  function renderProjects() {
+    var box = el('projList');
+    if (!box || !window.PannerStore) return;
+    window.PannerStore.listProjects().then(function (list) {
+      box.innerHTML = '';
+      if (!list.length) {
+        var empty = document.createElement('p');
+        empty.className = 'proj-empty';
+        empty.textContent = 'لا توجد نسخ محفوظة بعد — عملك الحالي محفوظ تلقائياً على أي حال.';
+        box.appendChild(empty);
+        return;
+      }
+      list.forEach(function (proj) {
+        var row = document.createElement('div');
+        row.className = 'proj-row';
+
+        var open = document.createElement('button');
+        open.className = 'proj-open';
+        open.innerHTML = '';
+        open.appendChild(document.createTextNode(proj.name));
+        var meta = document.createElement('small');
+        meta.textContent = formatWhen(proj.savedAt) + ' · ' + proj.images + ' صورة';
+        open.appendChild(meta);
+        open.addEventListener('click', function () {
+          window.PannerStore.openProject(proj.name).then(function (ok) {
+            closeSheet();
+            toast(ok ? 'تم فتح «' + proj.name + '»' : 'تعذّر الفتح');
+          });
+        });
+
+        var delBtn = document.createElement('button');
+        delBtn.className = 'proj-del';
+        delBtn.title = 'حذف';
+        delBtn.textContent = '🗑';
+        delBtn.addEventListener('click', function () {
+          if (!confirm('حذف «' + proj.name + '»؟')) return;
+          window.PannerStore.deleteProject(proj.name).then(renderProjects);
+        });
+
+        row.appendChild(open);
+        row.appendChild(delBtn);
+        box.appendChild(row);
+      });
     });
   }
 
@@ -335,15 +446,9 @@
      ───────────────────────────────────────────────────────── */
   function boot() {
     groupDrawer();
-    buildZoomDock();
     buildMenu();
+    wireNativePicker();
     refreshSheet();
-
-    // The stage starts fitted so the whole banner is visible at a glance.
-    setTimeout(fitToScreen, 350);
-    window.addEventListener('orientationchange', function () {
-      setTimeout(fitToScreen, 350);
-    });
 
     // Android back button closes whatever is open before leaving the app.
     Host.onBackPressed = function () {

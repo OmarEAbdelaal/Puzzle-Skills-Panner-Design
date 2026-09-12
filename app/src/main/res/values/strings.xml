@@ -14,4 +14,5 @@
     <string name="nothing_exported_yet">Export a banner first, then share it.</string>
     <string name="share_export">Share banner</string>
     <string name="exports_location">Exports are saved to %1$s</string>
+    <string name="no_images_picked">No images selected.</string>
 </resources>

@@ -14,4 +14,5 @@
     <string name="nothing_exported_yet">صدّر بانر أولاً ثم شاركه.</string>
     <string name="share_export">مشاركة البانر</string>
     <string name="exports_location">تُحفظ التصديرات في %1$s</string>
+    <string name="no_images_picked">لم يتم اختيار أي صور.</string>
 </resources>

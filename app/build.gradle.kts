@@ -130,4 +130,7 @@ dependencies {
     // WebViewAssetLoader — serves assets/www over a real https origin so the
     // export canvas is never tainted and localStorage behaves normally.
     implementation("androidx.webkit:webkit:1.12.1")
+    // Phone photos record their rotation in EXIF instead of in the pixels;
+    // without this they come in sideways.
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
 }

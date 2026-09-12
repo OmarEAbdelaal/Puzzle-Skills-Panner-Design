@@ -635,6 +635,9 @@
 <div class="manual-bar" id="manualBar">
   <span class="mb-title" id="mbTitle">اسحب أي صورة لتحريكها</span>
   <span class="mb-sep"></span>
+  <button class="mb-btn" id="mbUndo" title="تراجع">↶</button>
+  <button class="mb-btn" id="mbRedo" title="إعادة">↷</button>
+  <span class="mb-sep"></span>
   <button class="mb-btn" id="mbFront" title="فوق الصور الأخرى">⬆ للأمام</button>
   <button class="mb-btn" id="mbBack" title="تحت الصور الأخرى">⬇ للخلف</button>
   <span class="mb-sep"></span>
@@ -684,6 +687,7 @@ let manualMode     = false;  // drag images by hand, with over/under stacking
 let manualPlaced   = null;   // frozen, hand-editable placement array
 let manualH        = 0;
 let selIdx         = -1;
+let restoring      = false; // true while a saved project is being applied
 
 const DEFAULT_MAXDIM = () => parseFloat(el('imgW').value)||13;
 // derive w×h from ratio keeping largest side = md
@@ -1088,6 +1092,7 @@ function buildPlacement(){
 
 // ─── Render ──────────────────────────────────────────────────
 function render(){
+  if(restoring) return;   // one render at the end of the restore instead of dozens
   const fabricW   = parseFloat(el('fabricW').value)||90;
   const maxdim    = parseFloat(el('imgW').value)||13;
   // in unified mode sync global value to all images (size + derived w×h)
@@ -1405,35 +1410,8 @@ el('manualBtn').addEventListener('click',()=>{
 });
 el('manualResetBtn').addEventListener('click',()=>{ enterManual(); saveManual(); render(); });
 
-// drag on the sheet
-el('sheet').addEventListener('pointerdown',e=>{
-  if(!manualMode||!manualPlaced) return;
-  const cell=e.target.closest('.cell');
-  if(!cell){ selectCell(-1); return; }
-  e.preventDefault();
-  const i=+cell.dataset.i, p=manualPlaced[i];
-  if(!p) return;
-  selectCell(i);
-  cell.classList.add('dragging');
-  const sx=e.clientX, sy=e.clientY, ox=p.x, oy=p.y;
-  const sheetW=parseFloat(el('sheet').style.width)/PXCM;
-  const move=ev=>{
-    let nx=ox+(ev.clientX-sx)/PXCM, ny=oy+(ev.clientY-sy)/PXCM;
-    nx=Math.max(-p.w*.6, Math.min(nx, sheetW-p.w*.4));
-    ny=Math.max(-p.h*.6, ny);
-    p.x=Math.round(nx*20)/20; p.y=Math.round(ny*20)/20;
-    cell.style.left=(p.x*PXCM)+'px'; cell.style.top=(p.y*PXCM)+'px';
-    syncManualBar();
-  };
-  const up=()=>{
-    document.removeEventListener('pointermove',move);
-    document.removeEventListener('pointerup',up);
-    cell.classList.remove('dragging');
-    render();
-  };
-  document.addEventListener('pointermove',move);
-  document.addEventListener('pointerup',up);
-});
+// Dragging, panning and pinch-zoom all live in gestures.js, which needs to
+// arbitrate between them; see PannerApp.beginItemDrag.
 
 // toolbar actions
 function selP(){ return manualPlaced&&manualPlaced[selIdx]; }
@@ -1629,6 +1607,195 @@ if(mobilePreviewBtn){
   });
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   Bridge for the app layers (store.js · gestures.js · android.js)
+
+   Those files are separate scripts, so rather than reaching into this
+   one's variables they go through here. Everything they need to read,
+   change, or re-run is published in one place.
+   ═══════════════════════════════════════════════════════════════ */
+(function(){
+
+  const INPUT_IDS = ['fabricW','imgW','gap','edgeAll','edgeTop','edgeBottom',
+                     'edgeLeft','edgeRight','repeat','bannerRepeat','sat',
+                     'order','exportDPI','fillMin'];
+
+  let idSeq = 0;
+
+  /**
+   * Every image gets a stable id. Saved states then refer to photos by id
+   * instead of carrying the pixels, so an undo stack of fifty moves does not
+   * mean fifty copies of the same thirty photographs.
+   */
+  function ensureIds(){
+    for(const img of imageList){
+      if(!img.id) img.id = 'im' + (++idSeq).toString(36) + Date.now().toString(36);
+    }
+  }
+
+  function isInline(src){ return typeof src === 'string' && src.startsWith('data:'); }
+
+  /**
+   * Everything worth surviving an app restart.
+   * Pass {light:true} to leave out the pixel data of user-added photos — the
+   * caller is then responsible for storing it once, keyed by image id.
+   */
+  function captureState(opts){
+    const light = !!(opts && opts.light);
+    ensureIds();
+    const inputs = {};
+    for(const id of INPUT_IDS){ const n = el(id); if(n) inputs[id] = n.value; }
+    return {
+      v: 2,
+      inputs,
+      flags: { feltColor, showGuides, allowRotation, splitLarge,
+               customSizeMode, fillGapsOn, edgeSplit, manualMode },
+      images: imageList.map(img => {
+        const o = Object.assign({}, img);
+        if(light && isInline(o.src)) o.src = null;
+        return o;
+      }),
+      manual: manualPlaced ? { h: manualH, p: manualPlaced } : null,
+    };
+  }
+
+  /** The data URLs of the photos currently loaded, keyed by image id. */
+  function inlineImages(){
+    ensureIds();
+    const out = {};
+    for(const img of imageList) if(isInline(img.src)) out[img.id] = img.src;
+    return out;
+  }
+
+  /**
+   * Restores a captured state.
+   *
+   * Toggles are restored by clicking their real buttons rather than by
+   * setting the flags here — that way this can never drift out of step with
+   * what those handlers actually do to the DOM. The `restoring` guard keeps
+   * it to a single render at the end.
+   */
+  function applyState(st, resolveSrc){
+    if(!st) return false;
+    restoring = true;
+    try{
+      for(const [id, v] of Object.entries(st.inputs || {})){
+        const n = el(id); if(n) n.value = v;
+      }
+      if(Array.isArray(st.images)){
+        // Photos stored by reference get their pixels back here; any that
+        // cannot be resolved are dropped rather than rendered as broken.
+        imageList = st.images.map(img => {
+          const o = Object.assign({}, img);
+          if(o.src == null && resolveSrc) o.src = resolveSrc(o.id);
+          return o;
+        }).filter(img => !!img.src);
+      }
+      manualPlaced = (st.manual && Array.isArray(st.manual.p) && st.manual.p.length)
+        ? st.manual.p : null;
+      manualH = st.manual ? (st.manual.h || 0) : 0;
+      selIdx  = -1;
+
+      const f = st.flags || {};
+      const click = (id, want, current) => {
+        if(typeof want === 'boolean' && want !== current) el(id).click();
+      };
+      click('guidesBtn',   f.showGuides,     showGuides);
+      click('rotateBtn',   f.allowRotation,  allowRotation);
+      click('splitBtn',    f.splitLarge,     splitLarge);
+      click('fillBtn',     f.fillGapsOn,     fillGapsOn);
+      click('sizeMode',    f.customSizeMode, customSizeMode);
+      click('edgeModeBtn', f.edgeSplit,      edgeSplit);
+
+      if(f.feltColor){
+        const i = FELTS.findIndex(([c]) => c === f.feltColor);
+        if(i >= 0) sw.children[i].click();
+      }
+      click('manualBtn', f.manualMode, manualMode);
+    } finally {
+      restoring = false;
+    }
+    updateStrip(); render(); syncManualBar();
+    return true;
+  }
+
+  /** Adds images that arrived from outside the page (the native picker). */
+  function addImages(items){
+    let added = 0;
+    for(const it of (items || [])){
+      if(!it || !it.src || !it.w || !it.h) continue;
+      const md = DEFAULT_MAXDIM();
+      const nd = dimsFromRatio(it.h / it.w, md);
+      imageList.push({
+        id: 'im' + (++idSeq).toString(36) + Date.now().toString(36),
+        src: it.src, w: it.w, h: it.h,
+        name: (it.name || 'صورة').slice(0, 20),
+        customSize: md,
+        customW: Math.round(nd.w * 10) / 10,
+        customH: Math.round(nd.h * 10) / 10,
+      });
+      added++;
+    }
+    if(added){ updateStrip(); render(); }
+    return added;
+  }
+
+  /**
+   * Starts moving a placed image. gestures.js decides *whether* a touch is a
+   * move (vs. a pan or a pinch) and feeds the movement in centimetres; the
+   * clamping and the live DOM update stay here, next to the layout model.
+   */
+  function beginItemDrag(index){
+    if(!manualMode || !manualPlaced) return null;
+    const p = manualPlaced[index];
+    if(!p) return null;
+    const cell = el('sheet').querySelector('.cell[data-i="' + index + '"]');
+    const ox = p.x, oy = p.y;
+    const sheetW = parseFloat(el('sheet').style.width) / PXCM;
+    if(cell) cell.classList.add('dragging');
+
+    return {
+      /** @param dxCm,dyCm movement since the gesture started, in centimetres */
+      move(dxCm, dyCm){
+        let nx = ox + dxCm, ny = oy + dyCm;
+        nx = Math.max(-p.w * 0.6, Math.min(nx, sheetW - p.w * 0.4));
+        ny = Math.max(-p.h * 0.6, ny);
+        p.x = Math.round(nx * 20) / 20;
+        p.y = Math.round(ny * 20) / 20;
+        if(cell){
+          cell.style.left = (p.x * PXCM) + 'px';
+          cell.style.top  = (p.y * PXCM) + 'px';
+        }
+        syncManualBar();
+      },
+      end(){
+        if(cell) cell.classList.remove('dragging');
+        render();
+        return (p.x !== ox || p.y !== oy);   // did anything actually move?
+      },
+      cancel(){
+        p.x = ox; p.y = oy;
+        if(cell) cell.classList.remove('dragging');
+        render();
+      },
+    };
+  }
+
+  window.PannerApp = {
+    PXCM,
+    captureState, applyState, addImages, beginItemDrag, inlineImages,
+    render: () => render(),
+    updateStrip: () => updateStrip(),
+    selectCell: (i) => selectCell(i),
+    syncManualBar: () => syncManualBar(),
+    enterManual: () => { enterManual(); render(); },
+    get manualMode(){ return manualMode; },
+    get manualPlaced(){ return manualPlaced; },
+    get selIdx(){ return selIdx; },
+    get imageCount(){ return imageList.length; },
+  };
+})();
+
 loadManual();
 if(manualPlaced){
   el('manualBtn').classList.add('on'); el('manualBtn').textContent='مفعّل';
@@ -1656,6 +1823,8 @@ initCrosshair();
     <rect x="82" y="58" width="22" height="14" rx="3" fill="rgba(255,255,255,.18)"/>
   </svg>
 </template>
+<script src="store.js"></script>
+<script src="gestures.js"></script>
 <script src="android.js"></script>
 </body>
 </html>

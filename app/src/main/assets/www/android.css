@@ -8,9 +8,6 @@
 body.in-app .bar-inner{
   padding-top: calc(10px + env(safe-area-inset-top));
 }
-body.in-app .stage{
-  padding-bottom: calc(96px + env(safe-area-inset-bottom));
-}
 
 /* ── Native feel: no text selection / no tap highlight ────── */
 body.in-app{
@@ -170,7 +167,7 @@ body.in-app .app-menu-btn{ display: flex; }
   bottom: calc(20px + env(safe-area-inset-bottom));
   flex-direction: column; gap: 8px;
 }
-body.in-app .zoom-dock{ display: flex; }
+body.gestures-on .zoom-dock{ display: flex; }
 .zoom-dock button{
   width: 44px; height: 44px; border-radius: 50%;
   border: 2px solid var(--line); background: var(--panel);
@@ -180,16 +177,37 @@ body.in-app .zoom-dock{ display: flex; }
   display: flex; align-items: center; justify-content: center;
 }
 .zoom-dock button:active{ background: var(--line); }
+body.manual-open .zoom-dock{ bottom: calc(86px + env(safe-area-inset-bottom)); }
 .zoom-dock .zoom-level{
   font-size: 11px; height: 30px; border-radius: 15px;
   border-style: dashed; cursor: default;
 }
 
-/* the sheet scales from its top-start corner so rulers stay aligned */
-body.in-app .sheet-outer{
-  transform-origin: top center;
-  transition: transform .12s ease-out;
+/* ── Canvas viewport (gestures.js) ────────────────────────── */
+/* The transform is translate() then scale(), so it must scale about the
+   top-left corner or the translation would be measured in scaled units. */
+.gestures-on .sheet-outer{
+  transform-origin: 0 0;
+  will-change: transform;
 }
+/* The stage is a fixed window that the canvas moves inside — it must not
+   scroll or hand touches to the browser, or panning fights scrolling. */
+.gestures-on .stage{
+  position: relative;
+  overflow: hidden;
+  touch-action: none;
+  padding: 0;
+  display: block;
+}
+/* Dragging an image should never start a text/image selection instead. */
+.gestures-on .sheet .cell,
+.gestures-on .sheet .cell img{
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: auto;
+}
+.gestures-on .sheet.manual .cell{ cursor: grab; }
 
 /* The desktop-only "mobile preview" frame makes no sense inside the app */
 body.in-app .mobile-preview-btn{ display: none !important; }
@@ -197,4 +215,98 @@ body.in-app .mobile-preview-btn{ display: none !important; }
 /* ── Export progress is more prominent on a phone ─────────── */
 body.in-app .progress-bar{
   height: 6px; border-radius: 3px;
+}
+
+
+/* ══ Manual toolbar ══════════════════════════════════════════
+   It used to be a centred fixed box that wrapped onto three rows on a
+   phone, covering the banner and the controls underneath it. Now it is
+   one edge-to-edge strip that scrolls sideways, is no taller than a
+   single row, and can be collapsed out of the way entirely.
+   ══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px){
+  .manual-bar{
+    left: 0; right: 0; bottom: 0;
+    transform: none;
+    max-width: none;
+    width: 100%;
+    border-radius: 14px 14px 0 0;
+    border-width: 2px 0 0;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    gap: 6px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    justify-content: flex-start;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .manual-bar::-webkit-scrollbar{ display: none; }
+  .manual-bar .mb-title{
+    font-size: 11px;
+    position: sticky;
+    inset-inline-start: 0;
+    background: var(--panel);
+    padding-inline-end: 6px;
+    z-index: 1;
+  }
+  .manual-bar .mb-btn,
+  .manual-bar .mb-num{ flex: 0 0 auto; min-height: 38px; }
+  .manual-bar .mb-num{ width: 62px; font-size: 16px; }
+
+  /* Collapsed: just the handle, so the canvas is fully visible. */
+  .manual-bar.collapsed > *:not(.mb-collapse){ display: none; }
+  .manual-bar.collapsed{
+    width: auto; left: auto;
+    inset-inline-end: 10px;
+    border-radius: 14px;
+    border-width: 2px;
+    padding: 6px;
+  }
+}
+
+.mb-collapse{
+  flex: 0 0 auto;
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  border: 2px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 15px; line-height: 1;
+  font-family: "Fredoka", sans-serif;
+  cursor: pointer;
+  display: none;
+  align-items: center; justify-content: center;
+}
+@media (max-width: 768px){
+  .mb-collapse{ display: flex; }
+}
+
+/* ── Saved projects list in the app menu ──────────────────── */
+.proj-list{ margin: 4px 0 10px; }
+.proj-row{
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 12px; margin-bottom: 6px;
+  border: 2px solid var(--line); border-radius: 12px;
+  background: var(--bg);
+}
+.proj-row .proj-open{
+  flex: 1; min-width: 0; text-align: start;
+  background: none; border: none; padding: 0;
+  font-family: inherit; font-size: 14px; font-weight: 700; color: var(--ink);
+  cursor: pointer;
+}
+.proj-row .proj-open small{
+  display: block; font-weight: 500; font-size: 11px;
+  color: var(--muted); margin-top: 2px;
+}
+.proj-row .proj-del{
+  flex: 0 0 auto;
+  width: 34px; height: 34px; border-radius: 9px;
+  border: 2px solid var(--line); background: var(--panel);
+  color: var(--pink); font-size: 15px; cursor: pointer;
+}
+.proj-empty{
+  font-size: 12px; color: var(--muted);
+  padding: 10px 2px 14px; text-align: center;
 }
