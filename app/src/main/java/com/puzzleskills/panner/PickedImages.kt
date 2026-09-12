@@ -62,8 +62,10 @@ object PickedImages {
     fun save(context: Context, uri: Uri): JSONObject? {
         return try {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            open(context, uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-                ?: return null
+            val boundsStream = open(context, uri) ?: return null
+            boundsStream.use { BitmapFactory.decodeStream(it, null, bounds) }
+            // A bounds-only decode intentionally returns no bitmap, even for a
+            // valid photo. Check the populated dimensions, not that return value.
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
                 Log.w(TAG, "not a decodable image: $uri")
                 return null

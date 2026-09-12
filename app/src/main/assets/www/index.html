@@ -652,21 +652,6 @@
 </div>
 
 <script>
-// ─── Initial images ──────────────────────────────────────────
-const INITIAL = [
-  {src:"img/fruit-01.jpg",w:1600,h:1333,name:"رمان"},
-  {src:"img/fruit-02.jpg",w:1152,h:1600,name:"توت"},
-  {src:"img/fruit-03.jpg",w:1189,h:1600,name:"بطيخ"},
-  {src:"img/fruit-04.jpg",w:1272,h:1356,name:"إجاص"},
-  {src:"img/fruit-05.jpg",    w:778, h:846, name:"موز"},
-  {src:"img/fruit-06.jpg",   w:653, h:692, name:"مانجو"},
-  {src:"img/fruit-07.jpg",w:716, h:804, name:"فراولة"},
-  {src:"img/fruit-08.jpg",w:474, h:687, name:"برقوق"},
-  {src:"img/fruit-09.jpg",    w:570, h:654, name:"برتقال"},
-  {src:"img/fruit-10.jpg",   w:575, h:670, name:"أناناس"},
-  {src:"img/fruit-11.jpg",                                           w:638, h:685, name:"تفاحة"},
-];
-
 const PXCM = 7.6;
 const FELTS = [
   ["#ffffff","أبيض"],["#2b6b4f","جوخ أخضر"],["#7a2b2b","جوخ نبيتي"],
@@ -674,7 +659,8 @@ const FELTS = [
 ];
 const STAT_COLORS = ["stat-pink","stat-blue","stat-green","stat-yellow","stat-dark"];
 
-let imageList      = [...INITIAL];
+// New designs start empty; store.js restores the user's saved project.
+let imageList      = [];
 let edgeSplit      = false;
 let feltColor      = FELTS[0][0];
 let showGuides     = false;
@@ -701,7 +687,6 @@ function ensureSize(img){
   }
   return img;
 }
-INITIAL.forEach(ensureSize);
 
 function el(id){ return document.getElementById(id); }
 function getEdge(){
