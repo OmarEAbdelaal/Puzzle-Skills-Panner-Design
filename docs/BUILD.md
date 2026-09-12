@@ -115,13 +115,18 @@ python3 -m http.server 8000
 
 ### الصور المرفقة · Bundled artwork
 
-`app/src/main/assets/www/img/` — أحد عشر صورة فاكهة بالإضافة إلى الشعار.
-لتغييرها: استبدل الملفات وحدّث مصفوفة `INITIAL` في أعلى السكربت داخل `index.html`
-(كل عنصر يحمل `src` و`w` و`h` والاسم).
+`app/src/main/assets/www/img/` — الشعار فقط. التصميم يبدأ فارغاً والمستخدم
+يضيف صوره من الهاتف.
 
-*Eleven fruit images plus the logo. To change them: replace the files and update the
-`INITIAL` array at the top of the script in `index.html` (each entry carries `src`, `w`, `h`
-and a name).*
+*Only the logo. A new design starts empty and the user adds their own images
+from the phone.*
+
+لإضافة صور مرفقة مع التطبيق: ضعها في `img/` ثم عرّف مصفوفة `INITIAL` في أعلى
+السكربت داخل `index.html` وابدأ `imageList` منها (كل عنصر يحمل `src` و`w` و`h` والاسم).
+
+*To ship images with the app again: drop them in `img/`, declare an `INITIAL`
+array at the top of the script in `index.html`, and seed `imageList` from it —
+each entry carries `src`, `w`, `h` and a name.*
 
 ---
 
