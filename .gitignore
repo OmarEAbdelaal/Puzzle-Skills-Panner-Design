@@ -1,0 +1,28 @@
+# Gradle / Android build output
+.gradle/
+build/
+app/build/
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+captures/
+.externalNativeBuild/
+.cxx/
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+
+# Keys that must never be committed.
+# The release signing key is supplied from GitHub secrets at build time and is
+# never stored here — see docs/SIGNING.md.
+*.jks
+*.keystore
+*.p12
+*.pepk
+keystore.properties

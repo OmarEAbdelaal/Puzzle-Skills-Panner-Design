@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">بانر بازل سكيلز</string>
+
+    <string name="exit_title">الخروج من التطبيق؟</string>
+    <string name="exit_message">يتم حفظ التوزيع تلقائياً.</string>
+    <string name="exit_confirm">خروج</string>
+
+    <string name="update_download_title">بانر بازل سكيلز</string>
+    <string name="update_download_desc">جارٍ تنزيل التحديث %1$s…</string>
+
+    <string name="no_browser_app">لا يوجد متصفّح على هذا الجهاز.</string>
+    <string name="no_gallery_app">لا يوجد تطبيق معرض أو ملفات على هذا الجهاز.</string>
+    <string name="nothing_exported_yet">صدّر بانر أولاً ثم شاركه.</string>
+    <string name="share_export">مشاركة البانر</string>
+    <string name="exports_location">تُحفظ التصديرات في %1$s</string>
+</resources>

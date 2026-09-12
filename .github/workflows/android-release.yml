@@ -1,0 +1,220 @@
+name: Build APK
+
+# Produces an installable APK and publishes it as a GitHub Release, so the
+# phone can download it straight from the Releases page — and so the in-app
+# updater has something to find.
+#
+#   • Push a tag  v1.2.3   → release "v1.2.3" with the APK attached.
+#   • Run manually         → builds, and optionally publishes a release.
+#   • Push to a branch     → builds and uploads a workflow artifact only.
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+      - 'claude/**'
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build, e.g. 1.0.0 (leave empty to use 0.0.<run number>)'
+        required: false
+        type: string
+      publish_release:
+        description: 'Publish a GitHub Release with the APK'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and publish APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the project
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # ── Version ──────────────────────────────────────────────
+      # A tag is the source of truth. versionCode has to increase
+      # monotonically or Android refuses to install the update, so it is
+      # derived arithmetically from the three version components.
+      - name: Work out the version
+        id: version
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            NAME="${GITHUB_REF#refs/tags/v}"
+          elif [[ -n "${{ inputs.version }}" ]]; then
+            NAME="${{ inputs.version }}"
+            NAME="${NAME#v}"
+          else
+            NAME="0.0.${GITHUB_RUN_NUMBER}"
+          fi
+
+          # 1.2.3 -> 10203 ; leaves room for 99 minor and 99 patch releases
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${NAME%%-*}"
+          MAJOR=${MAJOR:-0}; MINOR=${MINOR:-0}; PATCH=${PATCH:-0}
+          CODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
+          if [[ "$CODE" -lt 1 ]]; then CODE=$GITHUB_RUN_NUMBER; fi
+
+          echo "name=$NAME"  >> "$GITHUB_OUTPUT"
+          echo "code=$CODE"  >> "$GITHUB_OUTPUT"
+          echo "Building version $NAME (versionCode $CODE)"
+
+      # ── Signing ──────────────────────────────────────────────
+      # Updates only install over an existing app when the signature matches,
+      # which means a stable key. Set the four secrets below once
+      # (docs/SIGNING.md) and every release upgrades cleanly in place.
+      - name: Restore the signing key
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${KEYSTORE_BASE64}" ]]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=No signing key::ANDROID_KEYSTORE_BASE64 is not set. Building a debug-signed APK — it installs, but in-app updates will ask you to uninstall first. See docs/SIGNING.md."
+            exit 0
+          fi
+          echo "${KEYSTORE_BASE64}" | base64 -d > release.jks
+          if [[ ! -s release.jks ]]; then
+            echo "::error title=Bad signing key::ANDROID_KEYSTORE_BASE64 did not decode to a keystore."
+            exit 1
+          fi
+          {
+            echo "storeFile=release.jks"
+            echo "storePassword=${KEYSTORE_PASSWORD}"
+            echo "keyAlias=${KEY_ALIAS}"
+            echo "keyPassword=${KEY_PASSWORD}"
+          } > keystore.properties
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      # ── Build ────────────────────────────────────────────────
+      - name: Build release APK
+        if: steps.signing.outputs.signed == 'true'
+        run: >-
+          ./gradlew --no-daemon assembleRelease
+          -PappVersionName=${{ steps.version.outputs.name }}
+          -PappVersionCode=${{ steps.version.outputs.code }}
+
+      - name: Build debug APK (no signing key configured)
+        if: steps.signing.outputs.signed != 'true'
+        run: >-
+          ./gradlew --no-daemon assembleDebug
+          -PappVersionName=${{ steps.version.outputs.name }}
+          -PappVersionCode=${{ steps.version.outputs.code }}
+
+      - name: Collect the APK
+        id: apk
+        run: |
+          set -euo pipefail
+          if [[ "${{ steps.signing.outputs.signed }}" == "true" ]]; then
+            SRC=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
+            OUT="PuzzleSkills-Panner-v${{ steps.version.outputs.name }}.apk"
+          else
+            SRC=$(find app/build/outputs/apk/debug -name '*.apk' | head -1)
+            OUT="PuzzleSkills-Panner-v${{ steps.version.outputs.name }}-unsigned-debug.apk"
+          fi
+          if [[ -z "$SRC" ]]; then
+            echo "::error title=No APK::The build produced no APK."
+            exit 1
+          fi
+          mkdir -p dist && cp "$SRC" "dist/$OUT"
+          echo "path=dist/$OUT" >> "$GITHUB_OUTPUT"
+          echo "name=$OUT" >> "$GITHUB_OUTPUT"
+          echo "size=$(du -h "dist/$OUT" | cut -f1)" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "dist/$OUT" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          ls -la dist/
+
+      - name: Remove the signing key from the runner
+        if: always()
+        run: rm -f release.jks keystore.properties
+
+      - name: Upload the APK as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.name }}
+          path: ${{ steps.apk.outputs.path }}
+          retention-days: 90
+          if-no-files-found: error
+
+      # ── Release ──────────────────────────────────────────────
+      - name: Write the release notes
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_release
+        run: |
+          cat > release-notes.md <<'NOTES'
+          ## 📲 التثبيت على الأندرويد · Install on Android
+
+          1. افتح هذه الصفحة **من متصفّح هاتفك** واضغط على ملف `.apk` بالأسفل.
+             *Open this page **on your phone** and tap the `.apk` file below.*
+          2. عند ظهور تحذير "مصدر غير معروف"، اختر **السماح / Settings → Allow from this source**.
+          3. اضغط **تثبيت** ثم **فتح**.
+
+          ## ⬆️ التحديثات · Updates
+
+          التطبيق يتحقّق من التحديثات تلقائياً مرة يومياً، أو يدوياً من قائمة **⋮ ← التحقق من التحديثات**.
+          *The app checks for updates once a day, or on demand from **⋮ → Check for updates**.*
+
+          ## 🧾 الملف · File
+          NOTES
+          {
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Version | \`${{ steps.version.outputs.name }}\` (code ${{ steps.version.outputs.code }}) |"
+            echo "| Size | ${{ steps.apk.outputs.size }} |"
+            echo "| Min Android | 7.0 (API 24) |"
+            echo "| SHA-256 | \`${{ steps.apk.outputs.sha256 }}\` |"
+          } >> release-notes.md
+
+          if [[ "${{ steps.signing.outputs.signed }}" != "true" ]]; then
+            {
+              echo ""
+              echo "> ⚠️ **Debug build.** No release signing key is configured for this"
+              echo "> repository yet, so this APK is debug-signed. It installs and runs"
+              echo "> normally, but installing a later version may require uninstalling"
+              echo "> this one first. See \`docs/SIGNING.md\` to set the key up once."
+            } >> release-notes.md
+          fi
+
+      - name: Publish the GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="v${{ steps.version.outputs.name }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${{ steps.apk.outputs.path }}" --clobber
+            gh release edit "$TAG" --notes-file release-notes.md
+          else
+            gh release create "$TAG" "${{ steps.apk.outputs.path }}" \
+              --title "Puzzle Skills Panner $TAG" \
+              --notes-file release-notes.md \
+              --target "${{ github.sha }}"
+          fi
+          echo "### 📲 APK published: [$TAG](${{ github.server_url }}/${{ github.repository }}/releases/tag/$TAG)" >> "$GITHUB_STEP_SUMMARY"

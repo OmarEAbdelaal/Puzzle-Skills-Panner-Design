@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- The saved manual layout lives in WebView local storage; keep it,
+         skip the update bookkeeping. -->
+    <exclude domain="sharedpref" path="panner_updates.xml" />
+</full-backup-content>

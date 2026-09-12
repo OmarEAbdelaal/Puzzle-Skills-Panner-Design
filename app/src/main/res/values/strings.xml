@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Puzzle Skills Panner</string>
+
+    <string name="exit_title">Leave the app?</string>
+    <string name="exit_message">Your layout is saved automatically.</string>
+    <string name="exit_confirm">Leave</string>
+
+    <string name="update_download_title">Puzzle Skills Panner</string>
+    <string name="update_download_desc">Downloading update %1$s…</string>
+
+    <string name="no_browser_app">No browser app found on this device.</string>
+    <string name="no_gallery_app">No gallery or file app found on this device.</string>
+    <string name="nothing_exported_yet">Export a banner first, then share it.</string>
+    <string name="share_export">Share banner</string>
+    <string name="exports_location">Exports are saved to %1$s</string>
+</resources>

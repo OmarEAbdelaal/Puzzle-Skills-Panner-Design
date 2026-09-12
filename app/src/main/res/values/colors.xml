@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Puzzle Skills brand palette, matching the web UI -->
+    <color name="felt_bg">#FAEFD7</color>
+    <color name="felt_panel">#FFFCF4</color>
+    <color name="brand_ink">#1F2D5C</color>
+    <color name="brand_pink">#ED4C7C</color>
+    <color name="brand_blue">#3BB3E0</color>
+    <color name="brand_green">#7CC42C</color>
+    <color name="brand_yellow">#FFC835</color>
+    <color name="brand_line">#E8DCCA</color>
+</resources>

@@ -1,0 +1,1661 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#FFFCF4"/>
+<title>Puzzle Skills · تصميم بانر الجوخ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:     #FAEFD7;
+    --panel:  #FFFCF4;
+    --ink:    #1F2D5C;
+    --muted:  #8890A8;
+    --line:   #E8DCCA;
+    --pink:   #ED4C7C;
+    --blue:   #3BB3E0;
+    --green:  #7CC42C;
+    --yellow: #FFC835;
+    --dark:   #1F2D5C;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0;
+    background:var(--bg); color:var(--ink);
+    font-family:"Cairo","Fredoka",system-ui,sans-serif;
+  }
+  .app{ display:flex; flex-direction:column; min-height:100vh; }
+
+  /* ══ Rainbow top border ══ */
+  .bar{
+    position:sticky; top:0; z-index:20;
+    background:var(--panel);
+    border-bottom: 3px solid transparent;
+    border-image: linear-gradient(to left, #ED4C7C, #FFC835, #7CC42C, #3BB3E0) 1;
+    box-shadow: 0 2px 16px rgba(31,45,92,.09);
+  }
+  .bar-inner{
+    display:flex; flex-wrap:nowrap; align-items:center; gap:10px;
+    padding:10px 20px; max-width:1600px; margin:0 auto;
+  }
+  /* Controls drawer: on desktop always open as flex-wrap row */
+  .ctrls-drawer{
+    display:flex; flex-wrap:wrap; align-items:flex-end; gap:14px 18px;
+    padding:6px 20px 12px; max-width:1600px; margin:0 auto;
+    border-top:1px solid var(--line);
+  }
+  .ctrls-drawer .ctrl-row{ display:contents; }
+  .ctrls-drawer .ctrl{ display:flex; flex-direction:column; gap:5px; }
+  }
+
+  /* ── Logo + brand ── */
+  .brand{ display:flex; flex-direction:column; gap:3px; margin-inline-end:auto; }
+  .brand-top{ display:flex; align-items:center; gap:10px; }
+  .logo-img{
+    height:54px; width:54px; border-radius:14px;
+    object-fit:cover; object-position:center;
+    background:var(--bg);
+    box-shadow:0 2px 8px rgba(31,45,92,.15);
+    flex-shrink:0;
+  }
+  .brand-text{ display:flex; flex-direction:column; gap:1px; }
+  .brand-text b{
+    font-family:"Fredoka",sans-serif; font-size:16px; font-weight:700;
+    color:var(--ink); letter-spacing:.01em; line-height:1.2;
+  }
+  .brand-text span{ font-size:11px; color:var(--muted); line-height:1.4; }
+  .designer-tag{
+    font-size:10px; color:var(--muted); margin-top:1px;
+    display:flex; align-items:center; gap:4px;
+  }
+  .designer-tag strong{ color:var(--pink); font-weight:700; }
+
+  /* ── Controls ── */
+  .ctrl{ display:flex; flex-direction:column; gap:4px; }
+  .ctrl label{
+    font-family:"Fredoka",sans-serif; font-size:10px; font-weight:600;
+    color:var(--muted); text-transform:uppercase; letter-spacing:.06em;
+  }
+  .ctrl input[type=number], .ctrl select{
+    font-size:14px; font-family:"Cairo",sans-serif;
+    padding:7px 10px; border:2px solid var(--line);
+    border-radius:10px; background:var(--panel); color:var(--ink);
+    width:90px; transition:border-color .15s;
+  }
+  .ctrl input[type=number]:focus, .ctrl select:focus{
+    outline:none; border-color:var(--blue);
+  }
+  .ctrl input[type=range]{ width:110px; accent-color:var(--pink); }
+  .ctrl .val{ font-size:12px; color:var(--pink); font-weight:700; }
+
+  /* ── Swatches ── */
+  .swatches{ display:flex; gap:5px; flex-wrap:wrap; }
+  .swatches button{
+    width:26px; height:26px; border-radius:8px;
+    border:2.5px solid var(--line); cursor:pointer; padding:0;
+    transition:transform .12s, border-color .12s;
+  }
+  .swatches button:hover{ transform:scale(1.12); }
+  .swatches button.on{ border-color:var(--ink); box-shadow:0 0 0 2px #fff inset; }
+
+  /* ── Readout ── */
+  .readout{
+    display:flex; flex-wrap:wrap; gap:8px 22px; align-items:baseline;
+    padding:8px 20px; max-width:1600px; margin:0 auto;
+    border-top:1px solid var(--line); width:100%;
+  }
+  .readout .stat{ display:flex; flex-direction:column; }
+  .readout .stat b{
+    font-size:19px; font-family:"Fredoka",sans-serif;
+    font-variant-numeric:tabular-nums; font-weight:700;
+  }
+  .readout .stat small{ font-size:10px; color:var(--muted); }
+  .readout .stat b em{ font-style:normal; font-size:12px; color:var(--muted); font-weight:500; }
+  .stat-pink b{ color:var(--pink); }
+  .stat-blue b{ color:var(--blue); }
+  .stat-green b{ color:var(--green); }
+  .stat-yellow b{ color:var(--yellow); }
+  .stat-dark b{ color:var(--ink); }
+
+  /* ── Toggles & Buttons ── */
+  .toggle button{
+    font:inherit; font-family:"Fredoka",sans-serif; font-size:13px;
+    padding:6px 12px; border:2px solid var(--line);
+    background:var(--panel); border-radius:10px; cursor:pointer; color:var(--muted);
+    transition:all .15s;
+  }
+  .toggle button.on{ background:var(--green); color:#fff; border-color:var(--green); }
+  .toggle-sm{ font-family:"Fredoka",sans-serif; font-size:11px; font-weight:600;
+    padding:5px 9px; border:2px solid var(--line);
+    background:var(--panel); border-radius:8px; cursor:pointer; color:var(--muted);
+    white-space:nowrap; transition:all .15s; line-height:1; }
+  .toggle-sm.on{ background:var(--yellow); color:var(--ink); border-color:var(--yellow); }
+  .toggle-sm.custom{ background:var(--pink); color:#fff; border-color:var(--pink); }
+  .export-btn{
+    font-family:"Fredoka",sans-serif; font-size:14px; font-weight:700;
+    padding:9px 20px; background:var(--pink); color:#fff;
+    border:none; border-radius:12px; cursor:pointer;
+    letter-spacing:.02em; white-space:nowrap;
+    box-shadow:0 3px 0 #b8315a;
+    transition:opacity .15s, transform .12s, box-shadow .12s;
+  }
+  .export-btn:not(:disabled):hover{ opacity:.9; transform:translateY(-1px); box-shadow:0 4px 0 #b8315a; }
+  .export-btn:not(:disabled):active{ transform:translateY(1px); box-shadow:0 2px 0 #b8315a; }
+  .export-btn:disabled{ opacity:.5; cursor:not-allowed; }
+  .progress-bar{ height:4px; background:var(--line); border-radius:3px; overflow:hidden; margin-top:4px; display:none; }
+  .progress-bar span{ display:block; height:100%; background:var(--pink); width:0%; transition:width .1s; }
+
+  /* ══ Image strip ══ */
+  .img-strip{
+    background:var(--panel); border-bottom:2px solid var(--line);
+    padding:10px 20px; transition:background .2s, border-color .2s;
+  }
+  .img-strip.drag-over{
+    background:rgba(59,179,224,.08);
+    border-color:var(--blue);
+    outline:2px dashed var(--blue); outline-offset:-2px;
+  }
+  .strip-row{ display:flex; direction:ltr; gap:8px; align-items:stretch; min-height:90px; }
+
+  /* Add button */
+  .add-btn{
+    min-width:82px; height:88px;
+    border:2.5px dashed var(--blue); border-radius:14px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+    cursor:pointer; color:var(--blue); background:rgba(59,179,224,.05);
+    flex-shrink:0; transition:all .15s;
+  }
+  .add-btn:hover{ border-color:var(--blue); background:rgba(59,179,224,.12); transform:scale(1.04); }
+  .add-btn .plus-icon{ font-size:26px; line-height:1; font-weight:400; }
+  .add-btn span{
+    font-family:"Fredoka",sans-serif; font-size:10px; font-weight:600;
+    letter-spacing:.04em; direction:rtl; white-space:nowrap;
+  }
+
+  /* Thumbnails */
+  .thumbs{
+    display:flex; gap:8px; flex-wrap:nowrap;
+    align-items:stretch; overflow-x:auto; flex:1; min-width:0; padding-bottom:2px;
+  }
+  .thumbs::-webkit-scrollbar{ height:4px; }
+  .thumbs::-webkit-scrollbar-track{ background:transparent; }
+  .thumbs::-webkit-scrollbar-thumb{ background:var(--line); border-radius:4px; }
+
+  .img-thumb{ position:relative; width:70px; height:100px; border-radius:12px; overflow:hidden;
+    border:2.5px solid var(--line); flex-shrink:0; background:#f4f4f5;
+    transition:border-color .15s, transform .12s; }
+  .img-thumb:hover{ border-color:var(--pink); transform:translateY(-2px); }
+  .img-thumb .thumb-img{ width:100%; height:calc(100% - 32px); object-fit:contain; display:block; padding:4px; }
+  .thumb-name{ position:absolute; bottom:20px; left:0; right:0; height:13px;
+    background:rgba(31,45,92,.55); color:#fff;
+    font-family:"Cairo",sans-serif; font-size:8px;
+    display:flex; align-items:center; justify-content:center;
+    padding:0 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; direction:rtl; }
+  /* per-image size row */
+  .thumb-size{ position:absolute; bottom:0; left:0; right:0; height:20px;
+    display:flex; align-items:center; justify-content:center; gap:1px;
+    background:rgba(255,200,50,.92); }
+  .thumb-size input{ width:24px; font-size:10px; font-family:"Fredoka",sans-serif; font-weight:700;
+    border:none; background:transparent; color:var(--ink); text-align:center; padding:0; outline:none; }
+  .thumb-size span{ font-size:9px; color:var(--ink); font-weight:700; opacity:.65; }
+  .ratio-reset-btn{ position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%;
+    background:var(--blue); color:#fff; border:none; cursor:pointer; font-size:12px; font-weight:700;
+    display:flex; align-items:center; justify-content:center; padding:0; line-height:1;
+    opacity:0; transition:opacity .15s; box-shadow:0 1px 4px rgba(0,0,0,.25); z-index:6; }
+  .img-thumb:hover .ratio-reset-btn{ opacity:1; }
+  .mode-unified .ratio-reset-btn{ display:none; }
+  /* unified mode: hide size row + reset, restore original height */
+  .mode-unified .thumb-size{ display:none; }
+  .mode-unified .img-thumb{ height:88px; }
+  .mode-unified .img-thumb .thumb-img{ height:calc(100% - 20px); }
+  .mode-unified .thumb-name{ bottom:0; height:20px; font-size:9px; }
+  .del-btn{
+    position:absolute; top:3px; right:3px; width:20px; height:20px; border-radius:50%;
+    background:var(--pink); color:#fff; border:none; cursor:pointer; font-size:14px;
+    display:flex; align-items:center; justify-content:center;
+    padding:0; line-height:1; font-weight:700;
+    opacity:0; transition:opacity .15s;
+    box-shadow:0 1px 4px rgba(0,0,0,.25);
+  }
+  .img-thumb:hover .del-btn{ opacity:1; }
+
+  /* Count badge */
+  .strip-count{
+    font-family:"Fredoka",sans-serif; font-size:11px; color:var(--muted);
+    display:flex; align-items:center; flex-direction:column; justify-content:center;
+    padding-inline-end:8px; white-space:nowrap; border-inline-end:2px solid var(--line);
+    margin-inline-end:2px; height:88px; gap:2px;
+  }
+  .strip-count strong{ font-size:20px; color:var(--blue); font-weight:700; }
+
+  /* Empty strip */
+  .strip-empty{
+    flex:1; display:flex; align-items:center; justify-content:center; gap:10px;
+    color:var(--muted); font-size:13px; direction:rtl;
+    font-family:"Fredoka",sans-serif;
+  }
+
+  /* ══ Stage ══ */
+  .stage{ flex:1; overflow:auto; padding:32px 20px 80px; display:flex; justify-content:center; align-items:flex-start; }
+
+  /* Ruler grid: corner | ruler-x / ruler-y | sheet */
+  .sheet-outer{
+    display:grid;
+    grid-template-areas:"corner rx" "ry sheet";
+    grid-template-columns:28px auto;
+    grid-template-rows:28px auto;
+    box-shadow:0 12px 48px rgba(31,45,92,.22), 0 0 0 5px var(--bg);
+  }
+  .ruler-corner{
+    grid-area:corner; background:#ede8df;
+    border-right:1px solid var(--line); border-bottom:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    font-size:7px; color:var(--muted); font-family:"Fredoka",sans-serif;
+  }
+  .ruler-x{ grid-area:rx; position:relative; height:28px; background:#ede8df; border-bottom:1px solid var(--line); overflow:hidden; }
+  .ruler-y{ grid-area:ry; position:relative; width:28px; background:#ede8df; border-right:1px solid var(--line); overflow:hidden; }
+  /* X ticks */
+  .rtx{ position:absolute; bottom:0; display:flex; flex-direction:column; align-items:center; transform:translateX(-50%); }
+  .rtx .bar{ width:1px; background:rgba(31,45,92,.38); }
+  .rtx .bar.major{ height:10px; } .rtx .bar.minor{ height:5px; }
+  .rtx .lbl{ position:absolute; top:2px; font-size:8px; color:var(--ink); font-family:"Fredoka",sans-serif; white-space:nowrap; transform:translateX(-50%); }
+  /* Y ticks */
+  .rty{ position:absolute; right:0; display:flex; flex-direction:row; align-items:center; justify-content:flex-end; transform:translateY(-50%); }
+  .rty .bar{ height:1px; background:rgba(31,45,92,.38); }
+  .rty .bar.major{ width:10px; } .rty .bar.minor{ width:5px; }
+  .rty .lbl{ position:absolute; right:12px; font-size:8px; color:var(--ink); font-family:"Fredoka",sans-serif; white-space:nowrap; transform:translateY(-50%); line-height:1; }
+
+  .sheet{ grid-area:sheet; position:relative; outline:2px solid rgba(31,45,92,.15); }
+  .sheet .cell{ position:absolute; }
+  .sheet .cell img{ width:100%; height:100%; object-fit:fill; display:block; mix-blend-mode:multiply; }
+  /* Guides: outline is painted ABOVE children, never clipped by overflow:hidden */
+  .sheet.guides .cell{ outline:2px dashed rgba(237,76,124,.9); outline-offset:-1px; }
+  /* Crosshair */
+  .cross-h{ position:absolute; left:0; right:0; height:0; border-top:1.5px dashed rgba(255,255,255,.85); pointer-events:none; display:none; z-index:9001; }
+  .cross-v{ position:absolute; top:0; bottom:0; width:0; border-left:1.5px dashed rgba(255,255,255,.85); pointer-events:none; display:none; z-index:9001; }
+  .cross-lbl{ position:absolute; background:rgba(31,45,92,.92); color:#fff; font-size:11px; font-family:"Fredoka",sans-serif; padding:3px 9px; border-radius:7px; pointer-events:none; display:none; z-index:9002; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,.25); }
+
+  /* ── Manual move mode ── */
+  .sheet.manual{ cursor:default; }
+  .sheet.manual .cell{ cursor:grab; }
+  .sheet.manual .cell:hover{ outline:2px solid rgba(59,179,224,.85); outline-offset:-1px; }
+  .sheet.manual .cell.dragging{ cursor:grabbing; }
+  .sheet .cell.sel{ outline:3px solid var(--yellow) !important; outline-offset:-1px; box-shadow:0 0 0 2px rgba(31,45,92,.45); }
+  .manual-bar{
+    position:fixed; bottom:16px; left:50%; transform:translateX(-50%);
+    z-index:9500; display:none; align-items:center; gap:8px; flex-wrap:wrap; justify-content:center;
+    background:var(--panel); border:2px solid var(--line); border-radius:16px;
+    padding:9px 14px; box-shadow:0 8px 28px rgba(31,45,92,.28); max-width:calc(100vw - 24px);
+  }
+  .manual-bar.on{ display:flex; }
+  .manual-bar .mb-title{ font-family:"Fredoka",sans-serif; font-size:12px; font-weight:700; color:var(--muted); white-space:nowrap; }
+  .manual-bar .mb-title b{ color:var(--ink); }
+  .mb-btn{ font-family:"Fredoka",sans-serif; font-size:12px; font-weight:700; line-height:1;
+    padding:8px 11px; border-radius:10px; border:2px solid var(--line); background:var(--bg);
+    color:var(--ink); cursor:pointer; white-space:nowrap; transition:all .13s; }
+  .mb-btn:hover:not(:disabled){ border-color:var(--blue); color:var(--blue); transform:translateY(-1px); }
+  .mb-btn:disabled{ opacity:.4; cursor:not-allowed; }
+  .mb-btn.danger:hover:not(:disabled){ border-color:var(--pink); color:var(--pink); }
+  .mb-num{ width:54px; font-family:"Fredoka",sans-serif; font-size:12px; font-weight:700;
+    padding:7px 4px; border:2px solid var(--line); border-radius:9px; background:var(--bg);
+    color:var(--ink); text-align:center; }
+  .mb-sep{ width:2px; height:22px; background:var(--line); border-radius:2px; }
+
+  /* Banner repeat cut line */
+  .repeat-line{
+    position:absolute; left:0; right:0; height:0;
+    border-top:2.5px dashed rgba(237,76,124,.65);
+    pointer-events:none; z-index:10;
+  }
+  .repeat-label{
+    position:absolute; right:6px; font-size:10px; font-weight:700;
+    font-family:"Fredoka",sans-serif;
+    color:rgba(237,76,124,.9); background:rgba(255,255,255,.25);
+    padding:1px 6px; border-radius:5px;
+    transform:translateY(-1px); pointer-events:none; z-index:11;
+  }
+
+  /* Empty stage */
+  .stage-empty{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:14px;
+    color:rgba(255,255,255,.4); pointer-events:none;
+    font-family:"Fredoka",sans-serif;
+  }
+  .stage-empty p{ font-size:16px; margin:0; }
+
+  /* ── Hint ── */
+  .hint{
+    font-size:12px; color:var(--muted); padding:0 20px 18px;
+    max-width:1600px; margin:0 auto; line-height:1.7;
+    font-family:"Cairo",sans-serif;
+  }
+
+  /* ══════════════════════════════════════════
+     MOBILE RESPONSIVE  ≤ 768px
+  ══════════════════════════════════════════ */
+  @media (max-width: 768px){
+    /* ── Bar ── */
+    .bar{ position:sticky; top:0; z-index:30; }
+    .bar-inner{
+      flex-wrap:nowrap; align-items:center;
+      padding:10px 14px; gap:8px;
+    }
+    /* hide all ctrls by default on mobile */
+    .bar-inner .ctrl{ display:none; }
+    /* always show brand + toggle + export */
+    .brand{ display:flex !important; flex-direction:row !important; align-items:center; gap:8px; }
+    .brand-top{ gap:6px; }
+    .logo-img{ height:36px; width:36px; border-radius:8px; }
+    .brand-text b{ font-size:13px; }
+    .brand-text span, .designer-tag{ display:none; }
+    /* mobile toggle & export always visible */
+    .mobile-ctrl-toggle{ display:flex !important; }
+    .ctrl.ctrl-export{ display:flex !important; }
+    .ctrl.ctrl-export label{ display:none; }
+    /* readout compact */
+    .readout{ padding:5px 14px; gap:4px 12px; border-top:1px solid var(--line); }
+    .readout .stat b{ font-size:12px; }
+    .readout .stat b em{ font-size:10px; }
+    .readout .stat small{ font-size:8px; }
+    /* controls drawer on mobile */
+    .ctrls-drawer{
+      display:none;
+      flex-direction:column;
+      border-top:2px solid var(--line);
+      padding:12px 14px 16px;
+      position:sticky; top:57px; z-index:25;
+      background:var(--panel);
+      box-shadow:0 4px 20px rgba(31,45,92,.12);
+    }
+    .ctrls-drawer.open{ display:flex; }
+    .ctrls-drawer .ctrl-row{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px 14px;
+    }
+    .ctrls-drawer .ctrl{ display:flex; flex-direction:column; gap:4px; }
+    .ctrls-drawer .ctrl label{
+      font-family:"Fredoka",sans-serif; font-size:10px; font-weight:600;
+      color:var(--muted); text-transform:uppercase; letter-spacing:.05em;
+    }
+    .ctrls-drawer .ctrl input[type=number],
+    .ctrls-drawer .ctrl select{
+      font-size:14px; font-family:"Cairo",sans-serif;
+      padding:8px 10px; border:2px solid var(--line);
+      border-radius:10px; background:var(--bg); color:var(--ink); width:100%;
+    }
+    .ctrls-drawer .ctrl input[type=range]{ width:100%; accent-color:var(--pink); }
+    .ctrls-drawer .swatches button{ width:30px; height:30px; border-radius:9px; }
+    /* image strip on mobile */
+    .img-strip{ padding:8px 12px; }
+    .strip-row{ min-height:76px; gap:6px; }
+    .add-btn{ min-width:66px; height:74px; border-radius:10px; }
+    .img-thumb{ width:60px; height:88px; }
+    .mode-unified .img-thumb{ height:76px; }
+    /* stage */
+    .stage{ padding:16px 10px 60px; justify-content:flex-start; overflow:auto; }
+    /* hint hidden on mobile */
+    .hint{ display:none; }
+  }
+  /* ── Mobile preview mode ── */
+  .mobile-preview-btn{
+    position:fixed; bottom:18px; left:18px; z-index:999;
+    background:var(--ink); color:#fff;
+    font-family:"Fredoka",sans-serif; font-size:13px; font-weight:600;
+    padding:9px 16px; border-radius:22px; border:none; cursor:pointer;
+    box-shadow:0 4px 16px rgba(31,45,92,.3);
+    display:flex; align-items:center; gap:7px;
+    transition:background .15s, transform .12s;
+  }
+  .mobile-preview-btn:hover{ background:var(--blue); transform:translateY(-2px); }
+  .mobile-preview-btn.active{ background:var(--pink); }
+  /* Phone frame wrapper */
+  body.mobile-sim .app{
+    width:390px;
+    min-height:844px;
+    margin:30px auto;
+    border-radius:40px;
+    box-shadow:0 0 0 10px #1c1c1e, 0 0 0 12px #3a3a3c, 0 30px 80px rgba(0,0,0,.45);
+    overflow:hidden;
+    position:relative;
+  }
+  body.mobile-sim{
+    background:#111;
+    min-height:100vh;
+    padding:20px 0 60px;
+  }
+  body.mobile-sim .mobile-preview-btn{ left:50%; transform:translateX(-50%); bottom:10px; }
+  body.mobile-sim .mobile-preview-btn:hover{ transform:translateX(-50%) translateY(-2px); }
+  body.mobile-sim .stage{ justify-content:flex-start; overflow:auto; }
+  body.mobile-sim .sheet-outer{ margin:0; }
+  /* mirror all mobile-media rules for sim mode */
+  body.mobile-sim .bar-inner{ flex-wrap:nowrap; align-items:center; padding:10px 14px; gap:8px; }
+  body.mobile-sim .bar-inner .ctrl{ display:none; }
+  body.mobile-sim .brand{ flex-direction:row !important; align-items:center; gap:8px; }
+  body.mobile-sim .brand-top{ gap:6px; }
+  body.mobile-sim .logo-img{ height:36px; width:36px; border-radius:8px; }
+  body.mobile-sim .brand-text b{ font-size:13px; }
+  body.mobile-sim .brand-text span,
+  body.mobile-sim .designer-tag{ display:none; }
+  body.mobile-sim .mobile-ctrl-toggle{ display:flex !important; }
+  body.mobile-sim .ctrl.ctrl-export{ display:flex !important; }
+  body.mobile-sim .ctrl.ctrl-export label{ display:none; }
+  body.mobile-sim .readout{ padding:5px 14px; gap:4px 12px; }
+  body.mobile-sim .readout .stat b{ font-size:12px; }
+  body.mobile-sim .readout .stat b em{ font-size:10px; }
+  body.mobile-sim .readout .stat small{ font-size:8px; }
+  body.mobile-sim .ctrls-drawer{ display:none; flex-direction:column; border-top:2px solid var(--line); padding:12px 14px 16px; position:sticky; top:57px; z-index:25; background:var(--panel); box-shadow:0 4px 20px rgba(31,45,92,.12); }
+  body.mobile-sim .ctrls-drawer.open{ display:flex !important; }
+  body.mobile-sim .ctrls-drawer .ctrl-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; }
+  body.mobile-sim .ctrls-drawer .ctrl{ display:flex; flex-direction:column; gap:4px; }
+  body.mobile-sim .ctrls-drawer .ctrl input[type=number],
+  body.mobile-sim .ctrls-drawer .ctrl select{ font-size:14px; padding:8px 10px; border:2px solid var(--line); border-radius:10px; background:var(--bg); color:var(--ink); width:100%; }
+  body.mobile-sim .ctrls-drawer .ctrl input[type=range]{ width:100%; accent-color:var(--pink); }
+  body.mobile-sim .img-strip{ padding:8px 12px; }
+  body.mobile-sim .strip-row{ min-height:76px; gap:6px; }
+  body.mobile-sim .add-btn{ min-width:66px; height:74px; }
+  body.mobile-sim .img-thumb{ width:60px; }
+  body.mobile-sim .mode-unified .img-thumb{ height:76px; }
+  body.mobile-sim .stage{ padding:16px 10px 60px; }
+  body.mobile-sim .hint{ display:none; }
+  /* toggle button (hidden on desktop, shown on mobile) */
+  .mobile-ctrl-toggle{
+    display:none;
+    align-items:center; justify-content:center;
+    width:40px; height:40px; border-radius:10px;
+    border:2px solid var(--line); background:var(--panel);
+    font-size:22px; line-height:1; cursor:pointer; flex-shrink:0;
+    transition:background .15s, border-color .15s;
+  }
+  .mobile-ctrl-toggle.open{ background:var(--blue); border-color:var(--blue); color:#fff; }
+</style>
+<link rel="stylesheet" href="android.css"/>
+</head>
+<body>
+<div class="app">
+
+  <!-- ══ TOP BAR ══ -->
+  <div class="bar">
+    <!-- always-visible header row -->
+    <div class="bar-inner">
+      <div class="brand">
+        <div class="brand-top">
+          <img class="logo-img" src="img/logo.jpg" id="__logoImg" alt="Puzzle Skills Logo"/>
+          <div class="brand-text">
+            <b>Puzzle Skills · تصميم بانر الجوخ</b>
+            <span>تعبئة متراصة · أضف صورك · جاهز للطباعة والقص</span>
+            <div class="designer-tag">تصميم: <strong>إسراء عبد الظاهر</strong></div>
+          </div>
+        </div>
+      </div>
+      <!-- Mobile: toggle + export always visible -->
+      <button class="mobile-ctrl-toggle" id="ctrlsToggle" title="إعدادات">☰</button>
+      <div class="ctrl ctrl-export" style="justify-content:flex-end;">
+        <button class="export-btn" id="exportBtn">⬇ تصدير PNG</button>
+        <div class="progress-bar" id="progressBar"><span id="progressFill"></span></div>
+      </div>
+    </div>
+
+    <!-- Controls drawer: inline on desktop, toggle on mobile -->
+    <div class="ctrls-drawer" id="ctrlsDrawer">
+      <div class="ctrl-row">
+        <div class="ctrl">
+          <label>عرض القماش (سم)</label>
+          <input type="number" id="fabricW" value="90" min="20" max="300" step="1"/>
+        </div>
+        <div class="ctrl">
+          <label>أكبر ضلع (سم)</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="number" id="imgW" value="13" min="3" max="150" step="0.5" style="flex:1;min-width:0;"/>
+            <button id="sizeMode" class="toggle-sm on" title="موحّد: نفس الحجم لكل الصور">موحّد</button>
+          </div>
+        </div>
+        <div class="ctrl">
+          <label>فاصل داخلي (مم)</label>
+          <input type="number" id="gap" value="4" min="0" max="50" step="1"/>
+        </div>
+        <div class="ctrl" id="ctrlEdgePadding">
+          <label style="display:flex;align-items:center;gap:6px;">هامش الأطراف (مم) <button id="edgeModeBtn" class="toggle-sm on">موحّد</button></label>
+          <div id="edgeAllRow">
+            <input type="number" id="edgeAll" value="4" min="0" max="99" step="1"/>
+          </div>
+          <div id="edgeSidesRow" style="display:none;grid-template-columns:1fr 1fr;gap:6px 8px;margin-top:4px;">
+            <div style="display:flex;flex-direction:column;gap:3px;">
+              <span style="font-size:9px;color:var(--muted);font-family:'Fredoka',sans-serif;font-weight:600;">↑ أعلى</span>
+              <input type="number" id="edgeTop" value="4" min="0" max="99" step="1" style="width:100%;"/>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:3px;">
+              <span style="font-size:9px;color:var(--muted);font-family:'Fredoka',sans-serif;font-weight:600;">↓ أسفل</span>
+              <input type="number" id="edgeBottom" value="4" min="0" max="99" step="1" style="width:100%;"/>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:3px;">
+              <span style="font-size:9px;color:var(--muted);font-family:'Fredoka',sans-serif;font-weight:600;">← يسار</span>
+              <input type="number" id="edgeLeft" value="4" min="0" max="99" step="1" style="width:100%;"/>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:3px;">
+              <span style="font-size:9px;color:var(--muted);font-family:'Fredoka',sans-serif;font-weight:600;">→ يمين</span>
+              <input type="number" id="edgeRight" value="4" min="0" max="99" step="1" style="width:100%;"/>
+            </div>
+          </div>
+        </div>
+        <div class="ctrl">
+          <label>تكرار كل صورة</label>
+          <input type="number" id="repeat" value="4" min="1" max="30" step="1"/>
+        </div>
+        <div class="ctrl">
+          <label>تكرار البانر ✂</label>
+          <input type="number" id="bannerRepeat" value="1" min="1" max="20" step="1"/>
+        </div>
+        <div class="ctrl">
+          <label>تشبع <span class="val" id="satVal">1.20×</span></label>
+          <input type="range" id="sat" value="1.20" min="1" max="1.8" step="0.05"/>
+        </div>
+        <div class="ctrl">
+          <label>الترتيب</label>
+          <select id="order">
+            <option value="balanced">متوازن (الأطول أولاً)</option>
+            <option value="original">حسب الترتيب الأصلي</option>
+            <option value="shuffle">عشوائي</option>
+          </select>
+        </div>
+        <div class="ctrl">
+          <label>لون القماش</label>
+          <div class="swatches" id="swatches"></div>
+        </div>
+        <div class="ctrl">
+          <label>أدلّة</label>
+          <div class="toggle"><button id="guidesBtn">إظهار</button></div>
+        </div>
+        <div class="ctrl">
+          <label>تدوير للملاءمة ↻</label>
+          <div class="toggle"><button id="rotateBtn" class="on">مفعّل</button></div>
+        </div>
+        <div class="ctrl">
+          <label>تقسيم الصور الكبيرة ✂</label>
+          <div class="toggle"><button id="splitBtn" class="on">مفعّل</button></div>
+        </div>
+        <div class="ctrl">
+          <label style="display:flex;align-items:center;gap:6px;">تعبئة الفراغات ▦ <span class="val" id="fillCount"></span></label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <div class="toggle"><button id="fillBtn">مفعّل</button></div>
+            <input type="number" id="fillMin" value="2.5" min="0.5" max="20" step="0.5" title="أصغر مقاس لصور التعبئة (سم)" style="width:64px;"/>
+          </div>
+        </div>
+        <div class="ctrl">
+          <label>تحريك يدوي ✥</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <div class="toggle"><button id="manualBtn">إيقاف</button></div>
+            <button id="manualResetBtn" class="toggle-sm" title="إعادة التوليد التلقائي داخل الوضع اليدوي" style="display:none;">↺ إعادة</button>
+          </div>
+        </div>
+        <div class="ctrl">
+          <label>دقة التصدير</label>
+          <select id="exportDPI">
+            <option value="72">72 DPI — معاينة</option>
+            <option value="150" selected>150 DPI — طباعة</option>
+            <option value="300">300 DPI — عالية</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="readout" id="readout"></div>
+  </div>
+
+  <!-- ══ IMAGE STRIP ══ -->
+  <div class="img-strip" id="imgStrip">
+    <div class="strip-row">
+      <label class="add-btn" title="أضف صور · أو اسحب الملفات هنا">
+        <div class="plus-icon">+</div>
+        <span>أضف صور</span>
+        <input type="file" id="fileInput" accept="image/*" multiple style="display:none"/>
+      </label>
+      <div class="thumbs" id="thumbsContainer"></div>
+    </div>
+  </div>
+
+  <!-- ══ STAGE ══ -->
+  <div class="stage">
+    <div class="sheet-outer" id="sheetOuter">
+      <div class="ruler-corner">سم</div>
+      <div class="ruler-x" id="rulerX"></div>
+      <div class="ruler-y" id="rulerY"></div>
+      <div class="sheet" id="sheet"></div>
+    </div>
+  </div>
+  <div class="hint" id="hint"></div>
+
+</div>
+
+<!-- ══ MANUAL TOOLBAR ══ -->
+<div class="manual-bar" id="manualBar">
+  <span class="mb-title" id="mbTitle">اسحب أي صورة لتحريكها</span>
+  <span class="mb-sep"></span>
+  <button class="mb-btn" id="mbFront" title="فوق الصور الأخرى">⬆ للأمام</button>
+  <button class="mb-btn" id="mbBack" title="تحت الصور الأخرى">⬇ للخلف</button>
+  <span class="mb-sep"></span>
+  <input type="number" class="mb-num" id="mbW" step="0.5" min="0.5" title="العرض (سم)"/>
+  <span style="font-size:11px;color:var(--muted);font-weight:700;">×</span>
+  <input type="number" class="mb-num" id="mbH" step="0.5" min="0.5" title="الطول (سم)"/>
+  <button class="mb-btn" id="mbRot" title="تدوير 90°">↻</button>
+  <button class="mb-btn" id="mbDup" title="تكرار">⧉</button>
+  <button class="mb-btn danger" id="mbDel" title="حذف">✕ حذف</button>
+  <span class="mb-sep"></span>
+  <button class="mb-btn" id="mbFillNow" title="ملء كل الفراغات الحالية بصور إضافية">▦ املأ الفراغات</button>
+</div>
+
+<script>
+// ─── Initial images ──────────────────────────────────────────
+const INITIAL = [
+  {src:"img/fruit-01.jpg",w:1600,h:1333,name:"رمان"},
+  {src:"img/fruit-02.jpg",w:1152,h:1600,name:"توت"},
+  {src:"img/fruit-03.jpg",w:1189,h:1600,name:"بطيخ"},
+  {src:"img/fruit-04.jpg",w:1272,h:1356,name:"إجاص"},
+  {src:"img/fruit-05.jpg",    w:778, h:846, name:"موز"},
+  {src:"img/fruit-06.jpg",   w:653, h:692, name:"مانجو"},
+  {src:"img/fruit-07.jpg",w:716, h:804, name:"فراولة"},
+  {src:"img/fruit-08.jpg",w:474, h:687, name:"برقوق"},
+  {src:"img/fruit-09.jpg",    w:570, h:654, name:"برتقال"},
+  {src:"img/fruit-10.jpg",   w:575, h:670, name:"أناناس"},
+  {src:"img/fruit-11.jpg",                                           w:638, h:685, name:"تفاحة"},
+];
+
+const PXCM = 7.6;
+const FELTS = [
+  ["#ffffff","أبيض"],["#2b6b4f","جوخ أخضر"],["#7a2b2b","جوخ نبيتي"],
+  ["#1f2a44","جوخ كحلي"],["#111111","أسود"],["#d8c39a","بيج"]
+];
+const STAT_COLORS = ["stat-pink","stat-blue","stat-green","stat-yellow","stat-dark"];
+
+let imageList      = [...INITIAL];
+let edgeSplit      = false;
+let feltColor      = FELTS[0][0];
+let showGuides     = false;
+let allowRotation  = true;
+let splitLarge     = true;  // split images wider than the banner into printable tiles
+let customSizeMode = false;  // false=unified, true=per-image
+let _shuffleSeed   = Date.now();
+let fillGapsOn     = true;   // auto-fill leftover white space with extra images
+let manualMode     = false;  // drag images by hand, with over/under stacking
+let manualPlaced   = null;   // frozen, hand-editable placement array
+let manualH        = 0;
+let selIdx         = -1;
+
+const DEFAULT_MAXDIM = () => parseFloat(el('imgW').value)||13;
+// derive w×h from ratio keeping largest side = md
+function dimsFromRatio(ratio, md){ return ratio>=1 ? {w:md/ratio, h:md} : {w:md, h:md*ratio}; }
+function ensureSize(img){
+  const md = DEFAULT_MAXDIM();
+  if(!img.customSize) img.customSize = md;
+  if(img.customW==null || img.customH==null){
+    const d = dimsFromRatio(img.h/img.w, img.customSize);
+    img.customW = Math.round(d.w*10)/10; img.customH = Math.round(d.h*10)/10;
+  }
+  return img;
+}
+INITIAL.forEach(ensureSize);
+
+function el(id){ return document.getElementById(id); }
+function getEdge(){
+  if(!edgeSplit){
+    const v=(parseFloat(el('edgeAll').value)||0)/10;
+    return{top:v,bottom:v,left:v,right:v};
+  }
+  return{
+    top:(parseFloat(el('edgeTop').value)||0)/10,
+    bottom:(parseFloat(el('edgeBottom').value)||0)/10,
+    left:(parseFloat(el('edgeLeft').value)||0)/10,
+    right:(parseFloat(el('edgeRight').value)||0)/10,
+  };
+}
+
+// ─── Layout math ─────────────────────────────────────────────
+function itemDims(ratio, maxdim){
+  if(ratio >= 1) return {w:maxdim/ratio, h:maxdim};
+  return {w:maxdim, h:maxdim*ratio};
+}
+// Split an item wider than the usable width into vertical tiles that each fit.
+// Returns array of item specs; sliced tiles carry {k,n,fullW} for cropping + seam guides.
+function expandTiles(src, w, h, usableW){
+  if(!splitLarge || w <= usableW+1e-6) return [{src,w,h,slice:null}];
+  const n = Math.ceil(w/(usableW-1e-6));
+  const tw = w/n;
+  const out=[];
+  for(let k=0;k<n;k++) out.push({src,w:tw,h,slice:{k,n,fullW:w}});
+  return out;
+}
+function maxY(sky, x0, x1){
+  let y=0;
+  for(const s of sky){
+    if(s.x+s.width<=x0+1e-9||s.x>=x1-1e-9) continue;
+    y=Math.max(y,s.y);
+  }
+  return y;
+}
+function raise(sky,x0,x1,ny){
+  const out=[];
+  for(const s of sky){
+    const sx0=s.x,sx1=s.x+s.width;
+    if(sx1<=x0+1e-9||sx0>=x1-1e-9){out.push(s);continue;}
+    if(sx0<x0-1e-9) out.push({x:sx0,width:x0-sx0,y:s.y});
+    if(sx1>x1+1e-9) out.push({x:x1,width:sx1-x1,y:s.y});
+  }
+  out.push({x:x0,width:x1-x0,y:ny});
+  out.sort((a,b)=>a.x-b.x);
+  const m=[];
+  for(const s of out){
+    const l=m[m.length-1];
+    if(l&&Math.abs(l.y-s.y)<1e-9&&Math.abs(l.x+l.width-s.x)<1e-9) l.width+=s.width;
+    else m.push({...s});
+  }
+  return m;
+}
+function packSkyline(items,W,gap){
+  let sky=[{x:0,width:W,y:0}];
+  const placed=[];
+
+  // Wasted area below y in footprint [x0,x1] — used as tie-breaker
+  function localWaste(x0,x1,y){
+    let filled=0;
+    for(const s of sky){
+      const sx0=Math.max(s.x,x0), sx1=Math.min(s.x+s.width,x1);
+      if(sx1<=sx0) continue;
+      filled+=(sx1-sx0)*Math.min(s.y,y);
+    }
+    return (x1-x0)*y - filled;
+  }
+
+  for(const it of items){
+    const oris=[{w:it.w,h:it.h,rotated:false}];
+    // sliced tiles never rotate (would break the seam order)
+    if(allowRotation && !it.slice && Math.abs(it.w-it.h)>0.01 && it.h<=W+1e-6)
+      oris.push({w:it.h,h:it.w,rotated:true});
+
+    const cand=new Set([0]);
+    for(const s of sky){cand.add(s.x);cand.add(s.x+s.width);}
+
+    let best=null;
+    for(const ori of oris){
+      const pw=ori.w+gap;
+      for(const x of cand){
+        if(x+pw>W+1e-6) continue;
+        const y=maxY(sky,x,x+pw);
+        const score=y+ori.h;           // primary: minimize bottom edge
+        const waste=localWaste(x,x+pw,y); // secondary tie-breaker
+        if(!best||
+           score<best.score-1e-9||
+           (Math.abs(score-best.score)<1e-9&&waste<best.waste-1e-9)||
+           (Math.abs(score-best.score)<1e-9&&Math.abs(waste-best.waste)<1e-9&&x<best.x-1e-9)){
+          best={x,y,w:ori.w,h:ori.h,rotated:ori.rotated,score,waste};
+        }
+      }
+    }
+    if(!best){
+      const ori=oris[0];
+      best={x:0,y:maxY(sky,0,W),w:ori.w,h:ori.h,rotated:ori.rotated,score:0,waste:0};
+    }
+    const hg=gap/2;
+    placed.push({src:it.src,x:best.x+hg,y:best.y+hg,w:best.w,h:best.h,rotated:best.rotated,slice:it.slice||null});
+    sky=raise(sky,best.x,best.x+best.w+gap,best.y+best.h+gap);
+  }
+  const totalH=Math.max(0,...placed.map(p=>p.y+p.h));
+  return{placed,totalH};
+}
+// ─── Gap filling ─────────────────────────────────────────────
+// Repeatedly finds the largest empty rectangle left on the sheet and drops a
+// scaled-down image into it, until nothing bigger than minCm remains.
+function fillGaps(base, W, H, gapCm, minCm, pool){
+  if(!pool.length || H<=0) return [];
+  const CELL=0.3;
+  const cols=Math.max(1,Math.round(W/CELL)), rows=Math.max(1,Math.round(H/CELL));
+  if(cols*rows>900000) return [];
+  const occ=new Uint8Array(cols*rows);
+  const mark=(x,y,w,h)=>{
+    const c0=Math.max(0,Math.floor(x/CELL)), c1=Math.min(cols,Math.ceil((x+w)/CELL));
+    const r0=Math.max(0,Math.floor(y/CELL)), r1=Math.min(rows,Math.ceil((y+h)/CELL));
+    for(let r=r0;r<r1;r++){ const off=r*cols; for(let c=c0;c<c1;c++) occ[off+c]=1; }
+  };
+  const g=gapCm/2;
+  for(const p of base) mark(p.x-g,p.y-g,p.w+gapCm,p.h+gapCm);
+
+  const heights=new Int32Array(cols);
+  const stkI=new Int32Array(cols+1), stkH=new Int32Array(cols+1);
+  function largestEmptyRect(){
+    heights.fill(0);
+    let bA=0,bc0=0,bc1=0,br0=0,br1=0;
+    for(let r=0;r<rows;r++){
+      const off=r*cols;
+      for(let c=0;c<cols;c++) heights[c]= occ[off+c] ? 0 : heights[c]+1;
+      let sp=0;
+      for(let c=0;c<=cols;c++){
+        const hv = c===cols ? 0 : heights[c];
+        let start=c;
+        while(sp>0 && stkH[sp-1]>=hv){
+          sp--; const th=stkH[sp], ti=stkI[sp];
+          const area=th*(c-ti);
+          if(area>bA){ bA=area; bc0=ti; bc1=c; br1=r+1; br0=r+1-th; }
+          start=ti;
+        }
+        stkI[sp]=start; stkH[sp]=hv; sp++;
+      }
+    }
+    return bA ? {x:bc0*CELL,y:br0*CELL,w:(bc1-bc0)*CELL,h:(br1-br0)*CELL} : null;
+  }
+
+  const out=[];
+  for(let iter=0;iter<300;iter++){
+    const rect=largestEmptyRect();
+    if(!rect) break;
+    const availW=rect.w-gapCm, availH=rect.h-gapCm;
+    if(availW<minCm || availH<minCm) break;
+    const target=availW/availH;
+    let pick=pool[0], bestD=Infinity;
+    for(const im of pool){
+      const d=Math.abs(Math.log((im.w/im.h)/target));
+      if(d<bestD){ bestD=d; pick=im; }
+    }
+    const s=Math.min(availW/pick.w, availH/pick.h, 1);
+    const nw=pick.w*s, nh=pick.h*s;
+    if(nw<minCm||nh<minCm) break;
+    const nx=rect.x+g+(availW-nw)/2, ny=rect.y+g+(availH-nh)/2;
+    out.push({src:pick.src,x:nx,y:ny,w:nw,h:nh,rotated:!!pick.rotated,slice:null,fill:true});
+    mark(nx-g,ny-g,nw+gapCm,nh+gapCm);
+  }
+  return out;
+}
+
+function shuffled(arr){
+  const a=[...arr]; let seed=_shuffleSeed;
+  for(let i=a.length-1;i>0;i--){
+    seed=(seed*1664525+1013904223)&0xffffffff;
+    const j=Math.abs(seed)%(i+1);
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+// ─── Rulers ──────────────────────────────────────────────────
+function buildRulerX(wCm){
+  const r=el('rulerX'); if(!r) return;
+  r.style.width=(wCm*PXCM)+'px'; r.innerHTML='';
+  const step=wCm>60?10:wCm>20?5:2; const sub=step/5;
+  for(let i=0;i<=wCm+sub*.4;i+=sub){
+    const maj=Math.abs(Math.round(i/step)*step-i)<sub*.1;
+    const d=document.createElement('div'); d.className='rtx'; d.style.left=(i*PXCM)+'px';
+    const bar=document.createElement('div'); bar.className='bar'+(maj?' major':' minor'); d.appendChild(bar);
+    if(maj&&i>0){const lbl=document.createElement('div');lbl.className='lbl';lbl.textContent=Math.round(i);d.appendChild(lbl);}
+    r.appendChild(d);
+  }
+}
+function buildRulerY(hCm){
+  const r=el('rulerY'); if(!r) return;
+  r.style.height=(hCm*PXCM)+'px'; r.innerHTML='';
+  const step=hCm>60?10:hCm>20?5:2; const sub=step/5;
+  for(let i=0;i<=hCm+sub*.4;i+=sub){
+    const maj=Math.abs(Math.round(i/step)*step-i)<sub*.1;
+    const d=document.createElement('div'); d.className='rty'; d.style.top=(i*PXCM)+'px';
+    const bar=document.createElement('div'); bar.className='bar'+(maj?' major':' minor'); d.appendChild(bar);
+    if(maj&&i>0){const lbl=document.createElement('div');lbl.className='lbl';lbl.textContent=Math.round(i);d.appendChild(lbl);}
+    r.appendChild(d);
+  }
+}
+
+// ─── Crosshair ───────────────────────────────────────────────
+function addCrosshairDivs(){
+  const mk=(id,cls)=>{const d=document.createElement('div');d.id=id;d.className=cls;el('sheet').appendChild(d);};
+  mk('__crossH','cross-h'); mk('__crossV','cross-v'); mk('__crossLbl','cross-lbl');
+}
+function initCrosshair(){
+  el('sheet').addEventListener('mousemove',e=>{
+    const sheet=el('sheet');
+    const rect=sheet.getBoundingClientRect();
+    const x=e.clientX-rect.left, y=e.clientY-rect.top;
+    const xCm=(x/PXCM).toFixed(1), yCm=(y/PXCM).toFixed(1);
+    const ch=document.getElementById('__crossH');
+    const cv=document.getElementById('__crossV');
+    const cl=document.getElementById('__crossLbl');
+    if(!ch) return;
+    ch.style.top=y+'px'; ch.style.display='block';
+    cv.style.left=x+'px'; cv.style.display='block';
+    const sw=sheet.offsetWidth;
+    cl.style.left=((x+115<sw)?x+12:x-112)+'px';
+    cl.style.top=(y>36?y-30:y+10)+'px';
+    cl.textContent=`↔ ${xCm}   ↕ ${yCm} سم`;
+    cl.style.display='block';
+  });
+  el('sheet').addEventListener('mouseleave',()=>{
+    ['__crossH','__crossV','__crossLbl'].forEach(id=>{
+      const e2=document.getElementById(id); if(e2) e2.style.display='none';
+    });
+  });
+}
+
+// ─── Image strip ─────────────────────────────────────────────
+function updateStrip(){
+  const container=el('thumbsContainer');
+  container.innerHTML='';
+  // apply unified/custom mode class to container
+  container.classList.toggle('mode-unified', !customSizeMode);
+  if(imageList.length===0){
+    container.innerHTML=`<div class="strip-empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22" style="opacity:.4">
+        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+      </svg>
+      اسحب صوراً هنا أو اضغط <strong>+</strong>
+    </div>`;
+    return;
+  }
+  const badge=document.createElement('div');
+  badge.className='strip-count';
+  badge.innerHTML=`<strong>${imageList.length}</strong><span>صورة</span>`;
+  container.appendChild(badge);
+
+  imageList.forEach((img,idx)=>{
+    const thumb=document.createElement('div');
+    thumb.className='img-thumb';
+    const im=document.createElement('img');
+    im.className='thumb-img'; im.src=img.src; im.alt=img.name; im.loading='lazy';
+    const nameEl=document.createElement('div');
+    nameEl.className='thumb-name'; nameEl.textContent=img.name;
+    // per-image size row: عرض (W) × طول (H)
+    const sizeRow=document.createElement('div');
+    sizeRow.className='thumb-size';
+    const mkNum=(val,title)=>{
+      const inp=document.createElement('input');
+      inp.type='number'; inp.min='1'; inp.max='120'; inp.step='0.5';
+      inp.value=(Math.round(val*10)/10).toString(); inp.title=title;
+      inp.addEventListener('click',e=>e.stopPropagation());
+      return inp;
+    };
+    const wInp=mkNum(img.customW, 'العرض (سم)');
+    const hInp=mkNum(img.customH, 'الطول (سم)');
+    wInp.addEventListener('input',()=>{ img.customW=parseFloat(wInp.value)||img.customW; render(); });
+    hInp.addEventListener('input',()=>{ img.customH=parseFloat(hInp.value)||img.customH; render(); });
+    const sep=document.createElement('span'); sep.textContent='×';
+    sizeRow.appendChild(wInp); sizeRow.appendChild(sep); sizeRow.appendChild(hInp);
+    // reset to original aspect ratio
+    const resetBtn=document.createElement('button');
+    resetBtn.className='ratio-reset-btn'; resetBtn.innerHTML='↺'; resetBtn.title='إعادة النسب الأصلية';
+    resetBtn.addEventListener('click',(e)=>{
+      e.stopPropagation();
+      const d=dimsFromRatio(img.h/img.w, DEFAULT_MAXDIM());
+      img.customW=Math.round(d.w*10)/10; img.customH=Math.round(d.h*10)/10;
+      updateStrip(); render();
+    });
+
+    const delBtn=document.createElement('button');
+    delBtn.className='del-btn'; delBtn.innerHTML='&times;'; delBtn.title='حذف '+img.name;
+    delBtn.addEventListener('click',(e)=>{
+      e.stopPropagation();
+      imageList.splice(idx,1);
+      updateStrip(); render();
+    });
+    thumb.appendChild(im); thumb.appendChild(nameEl); thumb.appendChild(sizeRow); thumb.appendChild(resetBtn); thumb.appendChild(delBtn);
+    thumb.title='في الوضع اليدوي: اضغط لإضافة نسخة من هذه الصورة على البانر';
+    thumb.addEventListener('click',()=>{ if(manualMode) addToSheet(img); });
+    container.appendChild(thumb);
+  });
+}
+
+function handleFiles(files){
+  const imgs=[...files].filter(f=>f.type.startsWith('image/'));
+  if(!imgs.length) return;
+  let done=0;
+  for(const file of imgs){
+    const reader=new FileReader();
+    reader.onload=(e)=>{
+      const probe=new Image();
+      probe.onload=()=>{
+        const name=file.name.replace(/\.[^.]+$/,'').slice(0,20);
+        const nd=dimsFromRatio(probe.naturalHeight/probe.naturalWidth, DEFAULT_MAXDIM());
+        imageList.push({src:e.target.result,w:probe.naturalWidth,h:probe.naturalHeight,name,
+          customSize:DEFAULT_MAXDIM(),customW:Math.round(nd.w*10)/10,customH:Math.round(nd.h*10)/10});
+        done++; updateStrip();
+        if(done===imgs.length) render();
+      };
+      probe.onerror=()=>{done++;};
+      probe.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+// ─── Shared layout ────────────────────────────────────────
+function readParams(){
+  return {
+    fabricW  : parseFloat(el('fabricW').value)||90,
+    maxdim   : parseFloat(el('imgW').value)||13,
+    gapCm    : (parseFloat(el('gap').value)||0)/10,
+    edge     : getEdge(),
+    sat      : parseFloat(el('sat').value)||1.2,
+    order    : el('order').value,
+    repeat   : Math.max(1,parseInt(el('repeat').value)||4),
+    bannerRpt: Math.max(1,parseInt(el('bannerRepeat').value)||1),
+    fillMin  : Math.max(.5, parseFloat(el('fillMin').value)||2.5),
+  };
+}
+function imgDims(img,P){
+  return customSizeMode ? {w:img.customW||P.maxdim, h:img.customH||P.maxdim}
+                        : itemDims(img.h/img.w, P.maxdim);
+}
+function buildPlacement(){
+  const P=readParams();
+  if(manualMode && manualPlaced){
+    const bottom=manualPlaced.reduce((m,p)=>Math.max(m,p.y+p.h),0);
+    return {P,base:manualPlaced,baseH:bottom,placed:manualPlaced,
+      totalH:Math.max(manualH, bottom+P.edge.bottom), manual:true,
+      fills:manualPlaced.filter(p=>p.fill).length};
+  }
+  if(!customSizeMode) imageList.forEach(img=>{
+    img.customSize=P.maxdim;
+    const d=dimsFromRatio(img.h/img.w,P.maxdim);
+    img.customW=Math.round(d.w*10)/10; img.customH=Math.round(d.h*10)/10;
+  });
+  const innerW=Math.max(1, P.fabricW - P.edge.left - P.edge.right);
+  let items=[];
+  for(let r=0;r<P.repeat;r++) for(const img of imageList){
+    const dims=imgDims(img,P);
+    for(const t of expandTiles(img.src, dims.w, dims.h, innerW)) items.push(t);
+  }
+  if(P.order==='balanced') items.sort((a,b)=>(b.h-a.h)||(b.w-a.w));
+  else if(P.order==='shuffle') items=shuffled(items);
+
+  const packed=packSkyline(items,innerW,P.gapCm);
+  let base=packed.placed; const baseH=packed.totalH;
+  let fills=0;
+  if(fillGapsOn && base.length){
+    const pool=[];
+    for(const img of imageList){
+      const d=imgDims(img,P);
+      pool.push({src:img.src,w:d.w,h:d.h,rotated:false});
+      if(allowRotation && Math.abs(d.w-d.h)>0.01) pool.push({src:img.src,w:d.h,h:d.w,rotated:true});
+    }
+    const added=fillGaps(base, innerW, baseH, P.gapCm, P.fillMin, pool);
+    fills=added.length;
+    base=base.concat(added);
+  }
+  const placed=[];
+  for(let r=0;r<P.bannerRpt;r++)
+    for(const p of base) placed.push({...p,x:p.x+P.edge.left,y:p.y+baseH*r+P.edge.top});
+  const totalH=baseH*P.bannerRpt+P.edge.top+P.edge.bottom;
+  return {P,base,baseH,placed,totalH,manual:false,fills};
+}
+
+// ─── Render ──────────────────────────────────────────────────
+function render(){
+  const fabricW   = parseFloat(el('fabricW').value)||90;
+  const maxdim    = parseFloat(el('imgW').value)||13;
+  // in unified mode sync global value to all images (size + derived w×h)
+  if(!customSizeMode) imageList.forEach(img=>{
+    img.customSize=maxdim;
+    const d=dimsFromRatio(img.h/img.w,maxdim);
+    img.customW=Math.round(d.w*10)/10; img.customH=Math.round(d.h*10)/10;
+  });
+  const gapCm     = (parseFloat(el('gap').value)||0)/10;
+  const edge      = getEdge();
+  const sat       = parseFloat(el('sat').value)||1.2;
+  const order     = el('order').value;
+  const repeat    = Math.max(1,parseInt(el('repeat').value)||4);
+  const bannerRpt = Math.max(1,parseInt(el('bannerRepeat').value)||1);
+
+  el('satVal').textContent=sat.toFixed(2)+'×';
+
+  const sheet=el('sheet');
+  sheet.style.background=feltColor;
+  sheet.style.filter=`saturate(${sat})`;
+  sheet.classList.toggle('guides',showGuides);
+  sheet.innerHTML='';
+
+  if(imageList.length===0){
+    sheet.style.width=(fabricW*PXCM)+'px';
+    sheet.style.height='220px';
+    sheet.innerHTML=`<div class="stage-empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="52" height="52">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+      </svg>
+      <p>أضف صوراً من الشريط أعلاه</p>
+    </div>`;
+    buildRulerX(fabricW); buildRulerY(2); addCrosshairDivs();
+    el('readout').innerHTML=''; el('hint').innerHTML='';
+    return;
+  }
+
+  const L=buildPlacement();
+  const base=L.base, baseH=L.baseH, placed=L.placed, totalH=L.totalH, manual=L.manual;
+  el('fillCount').textContent = L.fills ? `+${L.fills}` : '';
+
+  sheet.style.width=(fabricW*PXCM)+'px';
+  sheet.style.height=(totalH*PXCM)+'px';
+  sheet.classList.toggle('manual',manualMode);
+
+  placed.forEach((p,i)=>{
+    const d=document.createElement('div');
+    d.className='cell'+(manualMode&&i===selIdx?' sel':'');
+    d.dataset.i=i;
+    if(p.z) d.style.zIndex=p.z;
+    d.style.left=(p.x*PXCM)+'px'; d.style.top=(p.y*PXCM)+'px';
+    d.style.width=(p.w*PXCM)+'px'; d.style.height=(p.h*PXCM)+'px';
+    if(p.rotated||p.slice) d.style.overflow='hidden';
+    const im=document.createElement('img');
+    im.src=p.src; im.loading='lazy';
+    if(p.rotated){
+      // cell is (origH × origW); render image rotated 90° to fill it
+      const cw=p.w*PXCM, ch=p.h*PXCM;
+      im.style.cssText=`position:absolute;top:50%;left:50%;width:${ch}px;height:${cw}px;transform:translate(-50%,-50%) rotate(90deg);object-fit:fill;mix-blend-mode:multiply;`;
+    } else if(p.slice){
+      // show only slice k of n: full-width image shifted left, clipped by the cell
+      const fullWpx=p.slice.fullW*PXCM, hpx=p.h*PXCM;
+      im.style.cssText=`position:absolute;top:0;left:${-(p.slice.k*p.w*PXCM)}px;width:${fullWpx}px;height:${hpx}px;object-fit:fill;mix-blend-mode:multiply;`;
+    }
+    d.appendChild(im);
+    // Rotation badge (guides mode)
+    if(p.rotated&&showGuides){
+      const badge=document.createElement('div');
+      badge.style.cssText='position:absolute;top:2px;left:2px;z-index:5;background:rgba(255,200,50,.88);color:#1F2D5C;font-size:9px;font-weight:800;border-radius:4px;padding:1px 4px;pointer-events:none;';
+      badge.textContent='↻';
+      d.appendChild(badge);
+    }
+    // Gap-fill badge
+    if(p.fill&&showGuides){
+      const b2=document.createElement('div');
+      b2.style.cssText='position:absolute;bottom:2px;left:2px;z-index:5;background:rgba(124,196,44,.9);color:#fff;font-size:9px;font-weight:800;border-radius:4px;padding:1px 4px;pointer-events:none;';
+      b2.textContent='▦';
+      d.appendChild(b2);
+    }
+    // Slice seam guide + piece label
+    if(p.slice){
+      const seam=document.createElement('div');
+      seam.style.cssText='position:absolute;inset:0;pointer-events:none;z-index:4;box-shadow:inset 0 0 0 1px rgba(59,179,224,.5);';
+      // dashed edge on sides that continue into the next/prev piece
+      if(p.slice.k>0)        seam.style.borderRight='2px dashed rgba(59,179,224,.9)';
+      if(p.slice.k<p.slice.n-1) seam.style.borderLeft='2px dashed rgba(59,179,224,.9)';
+      d.appendChild(seam);
+      const lbl=document.createElement('div');
+      lbl.style.cssText='position:absolute;top:2px;right:3px;z-index:5;background:rgba(59,179,224,.92);color:#fff;font-size:9px;font-weight:800;border-radius:4px;padding:1px 5px;pointer-events:none;font-family:"Fredoka",sans-serif;';
+      lbl.textContent=`✂ ${p.slice.k+1}/${p.slice.n}`;
+      d.appendChild(lbl);
+    }
+    sheet.appendChild(d);
+  });
+
+  // Cut lines
+  if(bannerRpt>1 && !manual){
+    for(let r=1;r<bannerRpt;r++){
+      const lineY=baseH*PXCM*r+edge.top*PXCM;
+      const line=document.createElement('div');
+      line.className='repeat-line'; line.style.top=lineY+'px';
+      sheet.appendChild(line);
+      const lbl=document.createElement('div');
+      lbl.className='repeat-label'; lbl.style.top=(lineY+4)+'px';
+      lbl.textContent=`✂ قص بانر ${r}`;
+      sheet.appendChild(lbl);
+    }
+  }
+
+  buildRulerX(fabricW); buildRulerY(totalH); addCrosshairDivs();
+
+  const area=base.reduce((s,p)=>s+p.w*p.h,0);
+  const fill=baseH>0?(area/(fabricW*baseH)*100):0;
+
+  const rotatedCount=base.filter(p=>p.rotated).length;
+  const stats=[
+    {cls:'stat-pink',  val:`${fabricW} × ${totalH.toFixed(1)}`,  em:'سم', label:'المقاس الكلي'},
+    {cls:'stat-blue',  val:`${base.length}`,                      em:'',   label: manual?'صورة على البانر (يدوي)':`${imageList.length} نوع × ${repeat} تكرار`},
+    ...(L.fills?[{cls:'stat-green',val:`${L.fills}`,em:'▦',label:'صورة تعبئة للفراغات'}]:[]),
+    ...(bannerRpt>1&&!manual?[{cls:'stat-yellow',val:`${bannerRpt}`,em:'×',label:'تكرار البانر'}]:[]),
+    {cls:'stat-green', val:`${maxdim}`,                           em:'سم', label:'أكبر ضلع'},
+    {cls:'stat-dark',  val:`${fill.toFixed(0)}%`,                 em:'',   label:'كثافة التعبئة'},
+    {cls:'stat-blue',  val:`${(totalH/100).toFixed(2)}`,          em:'م',  label:'الطول بالمتر'},
+    ...(rotatedCount>0?[{cls:'stat-yellow',val:`${rotatedCount}`,em:'↻',label:'صورة مدوّرة تلقائياً'}]:[]),
+  ];
+
+  el('readout').innerHTML=stats.map(s=>
+    `<div class="stat ${s.cls}"><b>${s.val} <em>${s.em}</em></b><small>${s.label}</small></div>`
+  ).join('');
+
+  const edgeStr = edgeSplit
+    ? `هامش: أعلى ${(edge.top*10).toFixed(0)} / أسفل ${(edge.bottom*10).toFixed(0)} / يسار ${(edge.left*10).toFixed(0)} / يمين ${(edge.right*10).toFixed(0)} مم`
+    : `هامش الأطراف ${(edge.top*10).toFixed(0)} مم`;
+  if(manual) saveManual();
+  el('hint').innerHTML=
+    `${imageList.length} صورة · أكبر ضلع = <b>${maxdim} سم</b> · فاصل داخلي ${(gapCm*10).toFixed(0)} مم · ${edgeStr} · `+
+    `تشبع ${sat.toFixed(2)}× · كل صورة تتكرر <b>${repeat}</b> مرات`+
+    (L.fills?` · تم ملء الفراغات بـ <b>${L.fills}</b> صورة إضافية (أصغر مقاس ${el('fillMin').value} سم)`:'')+
+    (manual?` · <b>الوضع اليدوي مفعّل</b> — اسحب أي صورة لتحريكها، واستخدم ⬆/⬇ لوضعها فوق أو تحت غيرها`:'')+
+    (bannerRpt>1&&!manual?` · البانر مكرر <b>${bannerRpt}</b> مرات — الخطوط الوردية = أماكن القص`:'')+
+    ` · عرض القماش ${fabricW} سم.`;
+  syncManualBar();
+}
+
+// ─── Swatches ────────────────────────────────────────────────
+const sw=el('swatches');
+FELTS.forEach(([c,name],i)=>{
+  const b=document.createElement('button');
+  b.style.background=c; b.title=name;
+  if(i===0) b.classList.add('on');
+  b.addEventListener('click',()=>{
+    feltColor=c;
+    [...sw.children].forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); render();
+  });
+  sw.appendChild(b);
+});
+
+// ─── Mobile controls toggle ─────────────────────────────────
+const ctrlsToggle = el('ctrlsToggle');
+const ctrlsDrawer = el('ctrlsDrawer');
+if(ctrlsToggle){
+  ctrlsToggle.addEventListener('click', ()=>{
+    const open = ctrlsDrawer.classList.toggle('open');
+    ctrlsToggle.classList.toggle('open', open);
+    ctrlsToggle.textContent = open ? '✕' : '☰';
+  });
+}
+
+// ─── Edge padding mode toggle ──────────────────────────────────
+el('edgeModeBtn').addEventListener('click',()=>{
+  edgeSplit=!edgeSplit;
+  const btn=el('edgeModeBtn');
+  const allRow=el('edgeAllRow');
+  const sidesRow=el('edgeSidesRow');
+  if(edgeSplit){
+    btn.textContent='مخصّص'; btn.classList.remove('on'); btn.classList.add('custom');
+    allRow.style.display='none';
+    sidesRow.style.display='grid';
+    const v=parseInt(el('edgeAll').value)||0;
+    el('edgeTop').value=v; el('edgeBottom').value=v;
+    el('edgeLeft').value=v; el('edgeRight').value=v;
+  } else {
+    btn.textContent='موحّد'; btn.classList.add('on'); btn.classList.remove('custom');
+    allRow.style.display='';
+    sidesRow.style.display='none';
+  }
+  render();
+});
+
+// ─── Size mode toggle ────────────────────────────────────────
+el('sizeMode').addEventListener('click',()=>{
+  customSizeMode=!customSizeMode;
+  const btn=el('sizeMode');
+  if(customSizeMode){
+    btn.textContent='مخصّص'; btn.classList.remove('on'); btn.classList.add('custom');
+    const md=parseFloat(el('imgW').value)||13;
+    imageList.forEach(img=>{ img.customSize=img.customSize||md; });
+    el('imgW').closest('.ctrl').style.opacity='.45';
+    el('imgW').disabled=true;
+  } else {
+    btn.textContent='موحّد'; btn.classList.add('on'); btn.classList.remove('custom');
+    el('imgW').closest('.ctrl').style.opacity='1';
+    el('imgW').disabled=false;
+  }
+  updateStrip(); render();
+});
+
+// ─── Event Listeners ─────────────────────────────────────────
+el('guidesBtn').addEventListener('click',()=>{
+  showGuides=!showGuides;
+  el('guidesBtn').classList.toggle('on',showGuides);
+  el('guidesBtn').textContent=showGuides?'إخفاء':'إظهار';
+  render();
+});
+el('rotateBtn').addEventListener('click',()=>{
+  allowRotation=!allowRotation;
+  el('rotateBtn').classList.toggle('on',allowRotation);
+  el('rotateBtn').textContent=allowRotation?'مفعّل':'معطّل';
+  render();
+});
+el('splitBtn').addEventListener('click',()=>{
+  splitLarge=!splitLarge;
+  el('splitBtn').classList.toggle('on',splitLarge);
+  el('splitBtn').textContent=splitLarge?'مفعّل':'معطّل';
+  render();
+});
+['fabricW','imgW','gap','edgeAll','edgeTop','edgeBottom','edgeLeft','edgeRight','repeat','bannerRepeat','sat','order'].forEach(id=>{
+  el(id).addEventListener('input', render);
+  el(id).addEventListener('change',render);
+});
+el('fileInput').addEventListener('change',(e)=>{
+  handleFiles(e.target.files); e.target.value='';
+});
+
+// Drag & drop
+let dragCount=0;
+const strip=el('imgStrip');
+strip.addEventListener('dragenter',(e)=>{
+  if(!e.dataTransfer.types.includes('Files')) return;
+  e.preventDefault(); dragCount++; strip.classList.add('drag-over');
+});
+strip.addEventListener('dragleave',()=>{
+  dragCount--; if(dragCount<=0){dragCount=0;strip.classList.remove('drag-over');}
+});
+strip.addEventListener('dragover',(e)=>e.preventDefault());
+strip.addEventListener('drop',(e)=>{
+  e.preventDefault(); dragCount=0; strip.classList.remove('drag-over');
+  handleFiles(e.dataTransfer.files);
+});
+document.addEventListener('dragover',(e)=>{if(e.dataTransfer.types.includes('Files'))e.preventDefault();});
+document.addEventListener('drop',(e)=>{
+  if(e.target.closest('#imgStrip')) return;
+  if(e.dataTransfer.files.length){e.preventDefault();handleFiles(e.dataTransfer.files);}
+});
+
+// ─── Gap-fill toggle ─────────────────────────────────────────
+el('fillBtn').classList.toggle('on',fillGapsOn);
+el('fillBtn').textContent=fillGapsOn?'مفعّل':'معطّل';
+el('fillBtn').addEventListener('click',()=>{
+  fillGapsOn=!fillGapsOn;
+  el('fillBtn').classList.toggle('on',fillGapsOn);
+  el('fillBtn').textContent=fillGapsOn?'مفعّل':'معطّل';
+  render();
+});
+el('fillMin').addEventListener('input',render);
+
+// ─── Manual move mode ────────────────────────────────────────
+function enterManual(){
+  manualMode=false; manualPlaced=null;
+  const L=buildPlacement();
+  manualPlaced=L.placed.map((p,i)=>({...p,z:i+1}));
+  manualH=L.totalH; manualMode=true; selIdx=-1;
+}
+function maxZ(){ return manualPlaced.reduce((m,p)=>Math.max(m,p.z||0),0); }
+function minZ(){ return manualPlaced.reduce((m,p)=>Math.min(m,p.z||0),1e9); }
+function selectCell(i){ selIdx=i; syncManualBar();
+  [...el('sheet').querySelectorAll('.cell')].forEach(c=>c.classList.toggle('sel',+c.dataset.i===i));
+}
+function syncManualBar(){
+  const barEl=el('manualBar');
+  barEl.classList.toggle('on',manualMode);
+  if(!manualMode) return;
+  const p=manualPlaced&&manualPlaced[selIdx];
+  ['mbFront','mbBack','mbRot','mbDup','mbDel','mbW','mbH'].forEach(id=>{ el(id).disabled=!p; });  if(p){
+    el('mbTitle').innerHTML=`<b>صورة محدّدة</b> · ↔ ${p.x.toFixed(1)} · ↕ ${p.y.toFixed(1)} سم`;
+    if(document.activeElement!==el('mbW')) el('mbW').value=Math.round(p.w*10)/10;
+    if(document.activeElement!==el('mbH')) el('mbH').value=Math.round(p.h*10)/10;
+  }else{
+    el('mbTitle').textContent='اضغط أي صورة لتحديدها ثم اسحبها';
+    el('mbW').value=''; el('mbH').value='';
+  }
+}
+const MKEY='felt-banner-manual-v6';
+function saveManual(){
+  try{ manualPlaced ? localStorage.setItem(MKEY,JSON.stringify({h:manualH,p:manualPlaced}))
+                    : localStorage.removeItem(MKEY); }catch(e){}
+}
+function loadManual(){
+  try{ const raw=localStorage.getItem(MKEY); if(!raw) return;
+    const d=JSON.parse(raw);
+    if(d&&Array.isArray(d.p)&&d.p.length){ manualPlaced=d.p; manualH=d.h||0; }
+  }catch(e){}
+}
+el('manualBtn').addEventListener('click',()=>{
+  if(manualMode){ manualMode=false; selIdx=-1; }        // keep manualPlaced — edits persist
+  else if(manualPlaced&&manualPlaced.length){ manualMode=true; selIdx=-1; }
+  else enterManual();
+  el('manualBtn').classList.toggle('on',manualMode);
+  el('manualBtn').textContent=manualMode?'مفعّل':'إيقاف';
+  el('manualResetBtn').style.display=manualMode?'':'none';
+  render();
+});
+el('manualResetBtn').addEventListener('click',()=>{ enterManual(); saveManual(); render(); });
+
+// drag on the sheet
+el('sheet').addEventListener('pointerdown',e=>{
+  if(!manualMode||!manualPlaced) return;
+  const cell=e.target.closest('.cell');
+  if(!cell){ selectCell(-1); return; }
+  e.preventDefault();
+  const i=+cell.dataset.i, p=manualPlaced[i];
+  if(!p) return;
+  selectCell(i);
+  cell.classList.add('dragging');
+  const sx=e.clientX, sy=e.clientY, ox=p.x, oy=p.y;
+  const sheetW=parseFloat(el('sheet').style.width)/PXCM;
+  const move=ev=>{
+    let nx=ox+(ev.clientX-sx)/PXCM, ny=oy+(ev.clientY-sy)/PXCM;
+    nx=Math.max(-p.w*.6, Math.min(nx, sheetW-p.w*.4));
+    ny=Math.max(-p.h*.6, ny);
+    p.x=Math.round(nx*20)/20; p.y=Math.round(ny*20)/20;
+    cell.style.left=(p.x*PXCM)+'px'; cell.style.top=(p.y*PXCM)+'px';
+    syncManualBar();
+  };
+  const up=()=>{
+    document.removeEventListener('pointermove',move);
+    document.removeEventListener('pointerup',up);
+    cell.classList.remove('dragging');
+    render();
+  };
+  document.addEventListener('pointermove',move);
+  document.addEventListener('pointerup',up);
+});
+
+// toolbar actions
+function selP(){ return manualPlaced&&manualPlaced[selIdx]; }
+el('mbFront').addEventListener('click',()=>{ const p=selP(); if(!p)return; p.z=maxZ()+1; render(); });
+el('mbBack').addEventListener('click', ()=>{ const p=selP(); if(!p)return; p.z=minZ()-1; render(); });
+el('mbRot').addEventListener('click',  ()=>{ const p=selP(); if(!p)return;
+  const cx=p.x+p.w/2, cy=p.y+p.h/2;
+  p.rotated=!p.rotated; const t=p.w; p.w=p.h; p.h=t;
+  p.x=cx-p.w/2; p.y=Math.max(0,cy-p.h/2); render(); });
+el('mbDup').addEventListener('click',  ()=>{ const p=selP(); if(!p)return;
+  manualPlaced.push({...p,x:p.x+1,y:p.y+1,z:maxZ()+1});
+  selIdx=manualPlaced.length-1; render(); });
+el('mbDel').addEventListener('click',  ()=>{ if(selIdx<0)return;
+  manualPlaced.splice(selIdx,1); selIdx=-1; render(); });
+el('mbFillNow').addEventListener('click',()=>{
+  if(!manualMode||!manualPlaced) return;
+  const P=readParams();
+  const W=Math.max(1,P.fabricW-P.edge.left-P.edge.right);
+  const bottom=manualPlaced.reduce((m,p)=>Math.max(m,p.y+p.h),0);
+  const H=Math.max(1,bottom-P.edge.top);
+  const shifted=manualPlaced.map(p=>({...p,x:p.x-P.edge.left,y:p.y-P.edge.top}));
+  const pool=[];
+  for(const img of imageList){
+    const d=imgDims(img,P);
+    pool.push({src:img.src,w:d.w,h:d.h,rotated:false});
+    if(Math.abs(d.w-d.h)>0.01) pool.push({src:img.src,w:d.h,h:d.w,rotated:true});
+  }
+  const added=fillGaps(shifted,W,H,P.gapCm,P.fillMin,pool);
+  let z=maxZ();
+  for(const a of added) manualPlaced.push({...a,x:a.x+P.edge.left,y:a.y+P.edge.top,z:++z});
+  selIdx=-1; render();
+  if(!added.length) alert('لا توجد فراغات أكبر من '+P.fillMin+' سم.');
+});
+const mbSize=()=>{ const p=selP(); if(!p)return;
+  const w=parseFloat(el('mbW').value), h=parseFloat(el('mbH').value);
+  if(w>0) p.w=w; if(h>0) p.h=h; render(); };
+el('mbW').addEventListener('input',mbSize);
+el('mbH').addEventListener('input',mbSize);
+
+// keyboard nudge + delete
+document.addEventListener('keydown',e=>{
+  if(!manualMode||selIdx<0) return;
+  if(/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+  const p=selP(); if(!p) return;
+  const step=e.shiftKey?1:0.1;
+  const map={ArrowLeft:[-step,0],ArrowRight:[step,0],ArrowUp:[0,-step],ArrowDown:[0,step]};
+  if(map[e.key]){ e.preventDefault(); p.x=Math.round((p.x+map[e.key][0])*20)/20; p.y=Math.round((p.y+map[e.key][1])*20)/20; render(); }
+  else if(e.key==='Delete'||e.key==='Backspace'){ e.preventDefault(); manualPlaced.splice(selIdx,1); selIdx=-1; render(); }
+});
+
+// add a copy of a strip image onto the sheet (manual mode)
+function addToSheet(img){
+  if(!manualMode||!manualPlaced) return;
+  const P=readParams(), d=imgDims(img,P);
+  const sheetEl=el('sheet'), r=sheetEl.getBoundingClientRect();
+  const yCm=Math.max(0,(Math.min(Math.max(window.innerHeight/2,r.top+40),r.bottom-40)-r.top)/PXCM-d.h/2);
+  manualPlaced.push({src:img.src,x:(P.fabricW-d.w)/2,y:Math.round(yCm*20)/20,
+    w:d.w,h:d.h,rotated:false,slice:null,z:maxZ()+1});
+  selIdx=manualPlaced.length-1;
+  render();
+}
+
+// ─── PNG Export ──────────────────────────────────────────────
+function loadImgAsync(src){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    img.onload=()=>res(img);
+    img.onerror=()=>rej(new Error('فشل: '+src));
+    img.src=src;
+  });
+}
+async function exportPNG(){
+  if(!imageList.length){alert('أضف صوراً أولاً!');return;}
+  const btn=el('exportBtn'),bar=el('progressBar'),fill=el('progressFill');
+  const dpi=parseInt(el('exportDPI').value)||150;
+  const P=readParams();
+  const sat=P.sat, fabricW=P.fabricW;
+
+  btn.disabled=true; btn.textContent='جارٍ التصدير…';
+  bar.style.display='block'; fill.style.width='0%';
+
+  const L=buildPlacement();
+  const placed=[...L.placed].sort((a,b)=>(a.z||0)-(b.z||0));
+  const totalH=L.totalH;
+
+  const pxCm=dpi/2.54;
+  const CW=Math.round(fabricW*pxCm), CH=Math.round(totalH*pxCm);
+
+  // Preload images
+  const uniqueSrcs=[...new Set(placed.map(p=>p.src))];
+  const imgCache={};
+  for(let i=0;i<uniqueSrcs.length;i++){
+    fill.style.width=((i/uniqueSrcs.length)*30)+'%';
+    try{imgCache[uniqueSrcs[i]]=await loadImgAsync(uniqueSrcs[i]);}catch(e){console.warn(e);}
+  }
+
+  // Browser canvas limits — never reduce quality; split into full-DPI horizontal bands instead.
+  const MAX_SIDE=32767, MAX_AREA=268_000_000;
+  // Max band height (px) that keeps within BOTH the per-side and total-area caps.
+  let bandH=Math.min(MAX_SIDE, Math.floor(MAX_AREA/Math.max(CW,1)));
+  if(CW>MAX_SIDE){
+    alert(`عرض القماش كبير جداً على المتصفح عند ${dpi} DPI (${CW} بكسل).\nقلّل عرض القماش أو الدقة قليلاً.`);
+    btn.disabled=false;btn.textContent='⬇ تصدير PNG';bar.style.display='none';fill.style.width='0%';return;
+  }
+  // Boundary-aware band splitting: snap each cut DOWN to a line that
+  // crosses no image, so bands never cut a drawing in half.
+  const rects=placed.map(p=>{ const t=Math.round(p.y*pxCm); return {t, b:t+Math.round(p.h*pxCm)}; });
+  const cleanCut=(L)=>{ let C=Math.min(L,CH),moved=true;
+    while(moved){ moved=false; for(const r of rects){ if(r.t<C && C<r.b){ C=r.b; moved=true; } } }
+    return Math.min(C,CH); };
+  const targetH=Math.max(1,Math.floor(bandH*0.9)); // leave headroom for snap-down
+  const bounds=[0]; let cur=0, guard=0;
+  while(cur<CH && guard++<20000){
+    const target=cur+targetH;
+    if(target>=CH){ bounds.push(CH); break; }
+    let C=cleanCut(target);
+    if(C<=cur){ // an image taller than a band straddles — jump to its bottom
+      let nb=CH; for(const r of rects) if(r.b>cur && r.b<nb) nb=r.b; C=nb;
+    }
+    bounds.push(C); cur=C;
+  }
+  if(bounds[bounds.length-1]!==CH) bounds.push(CH);
+  const nBands=bounds.length-1;
+
+  const drawInto=(ctx,offY,bH)=>{
+    ctx.fillStyle=feltColor; ctx.fillRect(0,0,CW,bH);
+    ctx.filter=`saturate(${sat})`;
+    ctx.globalCompositeOperation='multiply';
+    for(const p of placed){
+      const img=imgCache[p.src]; if(!img) continue;
+      const X=Math.round(p.x*pxCm), Y=Math.round(p.y*pxCm)-offY;
+      const W=Math.round(p.w*pxCm), H=Math.round(p.h*pxCm);
+      if(Y+H<0||Y>bH) continue; // outside this band
+      if(p.rotated){
+        ctx.save(); ctx.translate(X+W/2, Y+H/2); ctx.rotate(Math.PI/2);
+        ctx.drawImage(img,-H/2,-W/2,H,W); ctx.restore();
+      } else if(p.slice){
+        const sw=img.naturalWidth/p.slice.n, sx=p.slice.k*sw;
+        ctx.drawImage(img, sx,0, sw,img.naturalHeight, X,Y,W,H);
+      } else {
+        ctx.drawImage(img, X,Y,W,H);
+      }
+    }
+  };
+
+  const saveBlob=(blob,fname)=>{
+    // Inside the Android app the blob is streamed to the device gallery;
+    // in a plain browser it falls back to a normal download.
+    if(window.PannerHost && window.PannerHost.saveBlob) return window.PannerHost.saveBlob(blob,fname);
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=fname; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),8000);
+  };
+  const toBlobAsync=(canvas)=>new Promise(res=>canvas.toBlob(res,'image/png'));
+
+  const fnBase=`PuzzleSkills-banner-${fabricW}cm-${Math.round(totalH)}cm-${dpi}dpi`;
+  for(let b=0;b<nBands;b++){
+    const offY=bounds[b];
+    const thisH=bounds[b+1]-bounds[b];
+    const canvas=document.createElement('canvas');
+    canvas.width=CW; canvas.height=thisH;
+    const ctx=canvas.getContext('2d');
+    drawInto(ctx, offY, thisH);
+    fill.style.width=(30+((b+1)/nBands)*65)+'%';
+    const blob=await toBlobAsync(canvas);
+    if(!blob){
+      alert('تعذّر إنشاء الصورة — المساحة كبيرة جداً على المتصفح.');
+      btn.disabled=false;btn.textContent='⬇ تصدير PNG';bar.style.display='none';fill.style.width='0%';return;
+    }
+    const fname = nBands>1 ? `${fnBase}-جزء${b+1}من${nBands}.png` : `${fnBase}.png`;
+    await saveBlob(blob, fname);
+    await new Promise(r=>setTimeout(r,250)); // let each download start
+  }
+  fill.style.width='100%';
+  if(nBands>1) setTimeout(()=>alert(`المقاس أكبر من حد المتصفح، فتم تصديره كـ ${nBands} ملفات PNG بكامل دقة ${dpi} DPI — والقص تم على حدود الصور (لا توجد أي صورة مقطوعة). الشرائط أفقية متتابعة من أعلى لأسفل، اطبعها ووصّلها بالترتيب.`),300);
+  setTimeout(()=>{btn.disabled=false;btn.textContent='⬇ تصدير PNG';bar.style.display='none';fill.style.width='0%';},1200);
+}
+el('exportBtn').addEventListener('click',exportPNG);
+
+// ─── Init ────────────────────────────────────────────────────
+// ─── Mobile preview toggle ─────────────────────────────────
+const mobilePreviewBtn = el('mobilePreviewBtn');
+if(mobilePreviewBtn){
+  mobilePreviewBtn.addEventListener('click', ()=>{
+    const active = document.body.classList.toggle('mobile-sim');
+    mobilePreviewBtn.classList.toggle('active', active);
+    el('mobilePreviewIcon').textContent = active ? '🖥️' : '📱';
+    el('mobilePreviewLabel').textContent = active ? 'معاينة ديسك توب' : 'معاينة موبايل';
+    // close drawer when switching
+    if(!active && ctrlsDrawer) ctrlsDrawer.classList.remove('open');
+    // re-render to pick up any layout changes
+    render();
+  });
+}
+
+loadManual();
+if(manualPlaced){
+  el('manualBtn').classList.add('on'); el('manualBtn').textContent='مفعّل';
+  el('manualResetBtn').style.display='';
+  manualMode=true;
+}
+updateStrip();
+render();
+initCrosshair();
+</script>
+<template id="__bundler_thumbnail" data-bg-color="#2b6b4f">
+  <svg viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
+    <rect width="120" height="80" fill="#2b6b4f"/>
+    <rect x="8" y="8" width="22" height="22" rx="3" fill="rgba(255,255,255,.18)"/>
+    <rect x="34" y="8" width="18" height="22" rx="3" fill="rgba(255,255,255,.18)"/>
+    <rect x="56" y="8" width="24" height="22" rx="3" fill="rgba(255,255,255,.18)"/>
+    <rect x="84" y="8" width="18" height="22" rx="3" fill="rgba(255,255,255,.18)"/>
+    <rect x="8" y="34" width="18" height="20" rx="3" fill="rgba(255,255,255,.18)"/>
+    <rect x="30" y="34" width="26" height="20" rx="3" fill="rgba(255,255,255,.18)"/>
+    <rect x="60" y="34" width="20" height="20" rx="3" fill="rgba(255,255,255,.18)"/>
+    <rect x="84" y="34" width="18" height="20" rx="3" fill="rgba(255,255,255,.18)"/>
+    <rect x="8" y="58" width="24" height="14" rx="3" fill="rgba(255,255,255,.18)"/>
+    <rect x="36" y="58" width="16" height="14" rx="3" fill="rgba(255,255,255,.18)"/>
+    <rect x="56" y="58" width="22" height="14" rx="3" fill="rgba(255,255,255,.18)"/>
+    <rect x="82" y="58" width="22" height="14" rx="3" fill="rgba(255,255,255,.18)"/>
+  </svg>
+</template>
+<script src="android.js"></script>
+</body>
+</html>
