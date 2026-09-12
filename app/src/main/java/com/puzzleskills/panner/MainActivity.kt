@@ -52,8 +52,9 @@ class MainActivity : AppCompatActivity() {
         const val MAX_PICK = 30
 
         /**
-         * Named explicitly rather than relying on "image/*": some providers
-         * filter on the concrete type, and PNG and JPEG are what matters here.
+         * Named explicitly rather than relying on the wildcard image type:
+         * some providers filter on the concrete type, and PNG and JPEG are
+         * what matter here.
          */
         val IMAGE_MIME_TYPES = arrayOf(
             "image/png", "image/jpeg", "image/jpg", "image/webp",
