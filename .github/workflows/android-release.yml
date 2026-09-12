@@ -147,7 +147,7 @@ jobs:
             OUT="PuzzleSkills-Panner-v${{ steps.version.outputs.name }}.apk"
           else
             SRC=$(find app/build/outputs/apk/debug -name '*.apk' | head -1)
-            OUT="PuzzleSkills-Panner-v${{ steps.version.outputs.name }}-unsigned-debug.apk"
+            OUT="PuzzleSkills-Panner-v${{ steps.version.outputs.name }}-debug-signed.apk"
           fi
           if [[ -z "$SRC" ]]; then
             echo "::error title=No APK::The build produced no APK."
