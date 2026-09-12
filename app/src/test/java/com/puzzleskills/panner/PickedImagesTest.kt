@@ -1,12 +1,14 @@
 package com.puzzleskills.panner
 
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.net.Uri
 import androidx.core.content.FileProvider
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -20,6 +22,16 @@ import java.io.File
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PickedImagesTest {
     private val context: Context get() = RuntimeEnvironment.getApplication()
+
+    @Before
+    fun attachProviderToThisTestApplication() {
+        // Each Robolectric test has a new filesDir; refresh FileProvider's
+        // cached roots so a previous test's temporary directory is not reused.
+        val info = requireNotNull(context.packageManager.resolveContentProvider(
+            "${BuildConfig.APPLICATION_ID}.fileprovider", PackageManager.GET_META_DATA
+        ))
+        FileProvider().attachInfo(context, info)
+    }
 
     private fun contentUri(file: File): Uri = FileProvider.getUriForFile(
         context, "${BuildConfig.APPLICATION_ID}.fileprovider", file
