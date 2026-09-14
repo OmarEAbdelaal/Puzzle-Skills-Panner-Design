@@ -308,7 +308,7 @@
       '<p class="sub">تصميم: إسراء عبد الظاهر</p>' +
       '<button class="sheet-item accent" id="miSaveProject">' +
         '<span class="ico">💾</span><span class="txt">حفظ نسخة باسم' +
-        '<small>احتفظ بالتصميم الحالي لتفتحه لاحقاً</small></span></button>' +
+        '<small>الطريقة الوحيدة للاحتفاظ بالتحريك اليدوي</small></span></button>' +
       '<div id="projList" class="proj-list"></div>' +
       '<button class="sheet-item" id="miUpdate">' +
         '<span class="ico">⬆️</span><span class="txt">التحقق من التحديثات' +
@@ -321,7 +321,7 @@
         '<small>إرسال ملف PNG الأخير</small></span></button>' +
       '<button class="sheet-item" id="miResetLayout">' +
         '<span class="ico">↺</span><span class="txt">إعادة ضبط التوزيع اليدوي' +
-        '<small>حذف الترتيب المحفوظ والعودة للتوزيع التلقائي</small></span></button>' +
+        '<small>العودة للتوزيع التلقائي — يمكن التراجع بـ ↶</small></span></button>' +
       '<button class="sheet-item" id="miRepo">' +
         '<span class="ico">🌐</span><span class="txt">صفحة المشروع على GitHub' +
         '<small>المصدر والإصدارات</small></span></button>' +

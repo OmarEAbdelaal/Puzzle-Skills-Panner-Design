@@ -709,12 +709,12 @@ function itemDims(ratio, maxdim){
 }
 // Split an item wider than the usable width into vertical tiles that each fit.
 // Returns array of item specs; sliced tiles carry {k,n,fullW} for cropping + seam guides.
-function expandTiles(src, w, h, usableW){
-  if(!splitLarge || w <= usableW+1e-6) return [{src,w,h,slice:null}];
+function expandTiles(src, w, h, usableW, rot){
+  if(!splitLarge || w <= usableW+1e-6) return [{src,w,h,slice:null,rot:!!rot}];
   const n = Math.ceil(w/(usableW-1e-6));
   const tw = w/n;
   const out=[];
-  for(let k=0;k<n;k++) out.push({src,w:tw,h,slice:{k,n,fullW:w}});
+  for(let k=0;k<n;k++) out.push({src,w:tw,h,slice:{k,n,fullW:w},rot:!!rot});
   return out;
 }
 function maxY(sky, x0, x1){
@@ -759,9 +759,12 @@ function packSkyline(items,W,gap){
   }
 
   for(const it of items){
-    const oris=[{w:it.w,h:it.h,rotated:false}];
-    // sliced tiles never rotate (would break the seam order)
-    if(allowRotation && !it.slice && Math.abs(it.w-it.h)>0.01 && it.h<=W+1e-6)
+    // it.w/it.h are already the footprint this piece will occupy, turned or
+    // not. `rotated` only tells the renderer to draw the photo on its side.
+    const oris=[{w:it.w,h:it.h,rotated:!!it.rot}];
+    // Auto-fit may try the other orientation — but never for a photo the user
+    // turned by hand, and never for a sliced tile (it would break the seams).
+    if(allowRotation && !it.rot && !it.slice && Math.abs(it.w-it.h)>0.01 && it.h<=W+1e-6)
       oris.push({w:it.h,h:it.w,rotated:true});
 
     const cand=new Set([0]);
@@ -977,14 +980,34 @@ function updateStrip(){
       updateStrip(); render();
     });
 
+    // Turn this one photo on its side. Auto-fit picks an orientation for you;
+    // this overrides it for this image, which is often what makes a wide
+    // picture fit the banner instead of being split into tiles.
+    const rotBtn=document.createElement('button');
+    rotBtn.className='rot-btn'+(img.rot90?' on':'');
+    rotBtn.innerHTML='↻';
+    rotBtn.title=img.rot90?'إلغاء تدوير هذه الصورة':'تدوير هذه الصورة ٩٠°';
+    rotBtn.addEventListener('click',(e)=>{
+      e.stopPropagation();
+      if(window.PannerStore) window.PannerStore.pushHistory('تدوير صورة');
+      img.rot90=!img.rot90;
+      const t=img.customW; img.customW=img.customH; img.customH=t;
+      updateStrip(); render();
+      if(window.PannerStore) window.PannerStore.scheduleSave();
+    });
+    if(img.rot90) im.classList.add('thumb-rot');
+
     const delBtn=document.createElement('button');
     delBtn.className='del-btn'; delBtn.innerHTML='&times;'; delBtn.title='حذف '+img.name;
     delBtn.addEventListener('click',(e)=>{
       e.stopPropagation();
+      if(window.PannerStore) window.PannerStore.pushHistory('حذف صورة');
       imageList.splice(idx,1);
       updateStrip(); render();
+      if(window.PannerStore) window.PannerStore.scheduleSave();
     });
-    thumb.appendChild(im); thumb.appendChild(nameEl); thumb.appendChild(sizeRow); thumb.appendChild(resetBtn); thumb.appendChild(delBtn);
+    thumb.appendChild(im); thumb.appendChild(nameEl); thumb.appendChild(sizeRow);
+    thumb.appendChild(rotBtn); thumb.appendChild(resetBtn); thumb.appendChild(delBtn);
     thumb.title='في الوضع اليدوي: اضغط لإضافة نسخة من هذه الصورة على البانر';
     thumb.addEventListener('click',()=>{ if(manualMode) addToSheet(img); });
     container.appendChild(thumb);
@@ -1029,8 +1052,11 @@ function readParams(){
   };
 }
 function imgDims(img,P){
-  return customSizeMode ? {w:img.customW||P.maxdim, h:img.customH||P.maxdim}
-                        : itemDims(img.h/img.w, P.maxdim);
+  const d = customSizeMode ? {w:img.customW||P.maxdim, h:img.customH||P.maxdim}
+                           : itemDims(img.h/img.w, P.maxdim);
+  // A photo the user turned by hand: swap the footprint here, so the packer
+  // and the tile splitter both see the shape it will actually occupy.
+  return img.rot90 ? {w:d.h, h:d.w} : d;
 }
 function buildPlacement(){
   const P=readParams();
@@ -1042,14 +1068,14 @@ function buildPlacement(){
   }
   if(!customSizeMode) imageList.forEach(img=>{
     img.customSize=P.maxdim;
-    const d=dimsFromRatio(img.h/img.w,P.maxdim);
+    const d=dimsFromRatio(img.rot90 ? img.w/img.h : img.h/img.w, P.maxdim);
     img.customW=Math.round(d.w*10)/10; img.customH=Math.round(d.h*10)/10;
   });
   const innerW=Math.max(1, P.fabricW - P.edge.left - P.edge.right);
   let items=[];
   for(let r=0;r<P.repeat;r++) for(const img of imageList){
     const dims=imgDims(img,P);
-    for(const t of expandTiles(img.src, dims.w, dims.h, innerW)) items.push(t);
+    for(const t of expandTiles(img.src, dims.w, dims.h, innerW, img.rot90)) items.push(t);
   }
   if(P.order==='balanced') items.sort((a,b)=>(b.h-a.h)||(b.w-a.w));
   else if(P.order==='shuffle') items=shuffled(items);
@@ -1061,6 +1087,10 @@ function buildPlacement(){
     const pool=[];
     for(const img of imageList){
       const d=imgDims(img,P);
+      // imgDims already returns the turned footprint, so a hand-turned photo
+      // needs rotated:true to be drawn the way it is measured — and it is not
+      // offered the other way round, because the user chose this one.
+      if(img.rot90){ pool.push({src:img.src,w:d.w,h:d.h,rotated:true}); continue; }
       pool.push({src:img.src,w:d.w,h:d.h,rotated:false});
       if(allowRotation && Math.abs(d.w-d.h)>0.01) pool.push({src:img.src,w:d.h,h:d.w,rotated:true});
     }
@@ -1135,7 +1165,14 @@ function render(){
     if(p.rotated||p.slice) d.style.overflow='hidden';
     const im=document.createElement('img');
     im.src=p.src; im.loading='lazy';
-    if(p.rotated){
+    if(p.rotated && p.slice){
+      // Turned *and* too wide to fit, so it is also sliced. Lay the whole
+      // turned photo out (its visual box is fullW × h once rotated) and shift
+      // it left so that slice k lands inside this cell, which clips the rest.
+      const fullWpx=p.slice.fullW*PXCM, hpx=p.h*PXCM;
+      const cx=fullWpx/2 - p.slice.k*p.w*PXCM;
+      im.style.cssText=`position:absolute;top:${hpx/2}px;left:${cx}px;width:${hpx}px;height:${fullWpx}px;transform:translate(-50%,-50%) rotate(90deg);object-fit:fill;mix-blend-mode:multiply;`;
+    } else if(p.rotated){
       // cell is (origH × origW); render image rotated 90° to fill it
       const cw=p.w*PXCM, ch=p.h*PXCM;
       im.style.cssText=`position:absolute;top:50%;left:50%;width:${ch}px;height:${cw}px;transform:translate(-50%,-50%) rotate(90deg);object-fit:fill;mix-blend-mode:multiply;`;
@@ -1213,7 +1250,6 @@ function render(){
   const edgeStr = edgeSplit
     ? `هامش: أعلى ${(edge.top*10).toFixed(0)} / أسفل ${(edge.bottom*10).toFixed(0)} / يسار ${(edge.left*10).toFixed(0)} / يمين ${(edge.right*10).toFixed(0)} مم`
     : `هامش الأطراف ${(edge.top*10).toFixed(0)} مم`;
-  if(manual) saveManual();
   el('hint').innerHTML=
     `${imageList.length} صورة · أكبر ضلع = <b>${maxdim} سم</b> · فاصل داخلي ${(gapCm*10).toFixed(0)} مم · ${edgeStr} · `+
     `تشبع ${sat.toFixed(2)}× · كل صورة تتكرر <b>${repeat}</b> مرات`+
@@ -1374,15 +1410,12 @@ function syncManualBar(){
   }
 }
 const MKEY='felt-banner-manual-v6';
-function saveManual(){
-  try{ manualPlaced ? localStorage.setItem(MKEY,JSON.stringify({h:manualH,p:manualPlaced}))
-                    : localStorage.removeItem(MKEY); }catch(e){}
-}
+/* Manual arrangements are no longer written to storage as you work — they are
+   kept only in a named copy the user chooses to save (⋮ → حفظ نسخة باسم).
+   loadManual() stays as a one-time cleanup of what older builds left behind. */
+function saveManual(){}
 function loadManual(){
-  try{ const raw=localStorage.getItem(MKEY); if(!raw) return;
-    const d=JSON.parse(raw);
-    if(d&&Array.isArray(d.p)&&d.p.length){ manualPlaced=d.p; manualH=d.h||0; }
-  }catch(e){}
+  try{ localStorage.removeItem(MKEY); }catch(e){}
 }
 el('manualBtn').addEventListener('click',()=>{
   if(manualMode){ manualMode=false; selIdx=-1; }        // keep manualPlaced — edits persist
@@ -1393,7 +1426,7 @@ el('manualBtn').addEventListener('click',()=>{
   el('manualResetBtn').style.display=manualMode?'':'none';
   render();
 });
-el('manualResetBtn').addEventListener('click',()=>{ enterManual(); saveManual(); render(); });
+el('manualResetBtn').addEventListener('click',()=>{ enterManual(); render(); });
 
 // Dragging, panning and pinch-zoom all live in gestures.js, which needs to
 // arbitrate between them; see PannerApp.beginItemDrag.
@@ -1421,6 +1454,7 @@ el('mbFillNow').addEventListener('click',()=>{
   const pool=[];
   for(const img of imageList){
     const d=imgDims(img,P);
+    if(img.rot90){ pool.push({src:img.src,w:d.w,h:d.h,rotated:true}); continue; }
     pool.push({src:img.src,w:d.w,h:d.h,rotated:false});
     if(Math.abs(d.w-d.h)>0.01) pool.push({src:img.src,w:d.h,h:d.w,rotated:true});
   }
@@ -1454,7 +1488,7 @@ function addToSheet(img){
   const sheetEl=el('sheet'), r=sheetEl.getBoundingClientRect();
   const yCm=Math.max(0,(Math.min(Math.max(window.innerHeight/2,r.top+40),r.bottom-40)-r.top)/PXCM-d.h/2);
   manualPlaced.push({src:img.src,x:(P.fabricW-d.w)/2,y:Math.round(yCm*20)/20,
-    w:d.w,h:d.h,rotated:false,slice:null,z:maxZ()+1});
+    w:d.w,h:d.h,rotated:!!img.rot90,slice:null,z:maxZ()+1});
   selIdx=manualPlaced.length-1;
   render();
 }
@@ -1530,7 +1564,16 @@ async function exportPNG(){
       const X=Math.round(p.x*pxCm), Y=Math.round(p.y*pxCm)-offY;
       const W=Math.round(p.w*pxCm), H=Math.round(p.h*pxCm);
       if(Y+H<0||Y>bH) continue; // outside this band
-      if(p.rotated){
+      if(p.rotated && p.slice){
+        // Rotating 90° clockwise maps the photo's vertical axis onto the
+        // banner's horizontal one, reversed — so slice k across the turned
+        // width is a horizontal band of the original, counted from the bottom.
+        const sh=img.naturalHeight/p.slice.n;
+        const sy=img.naturalHeight-(p.slice.k+1)*sh;
+        ctx.save(); ctx.translate(X+W/2, Y+H/2); ctx.rotate(Math.PI/2);
+        ctx.drawImage(img, 0, sy, img.naturalWidth, sh, -H/2, -W/2, H, W);
+        ctx.restore();
+      } else if(p.rotated){
         ctx.save(); ctx.translate(X+W/2, Y+H/2); ctx.rotate(Math.PI/2);
         ctx.drawImage(img,-H/2,-W/2,H,W); ctx.restore();
       } else if(p.slice){
@@ -1627,6 +1670,10 @@ if(mobilePreviewBtn){
    */
   function captureState(opts){
     const light = !!(opts && opts.light);
+    // A hand-made arrangement is deliberate, throwaway work. It is only kept
+    // when the user saves a named copy — the autosave leaves it out, so
+    // reopening the app never resurrects an experiment they had moved on from.
+    const withManual = !(opts && opts.includeManual === false);
     ensureIds();
     const inputs = {};
     for(const id of INPUT_IDS){ const n = el(id); if(n) inputs[id] = n.value; }
@@ -1634,13 +1681,14 @@ if(mobilePreviewBtn){
       v: 2,
       inputs,
       flags: { feltColor, showGuides, allowRotation, splitLarge,
-               customSizeMode, fillGapsOn, edgeSplit, manualMode },
+               customSizeMode, fillGapsOn, edgeSplit,
+               manualMode: withManual && manualMode },
       images: imageList.map(img => {
         const o = Object.assign({}, img);
         if(light && isInline(o.src)) o.src = null;
         return o;
       }),
-      manual: manualPlaced ? { h: manualH, p: manualPlaced } : null,
+      manual: (withManual && manualPlaced) ? { h: manualH, p: manualPlaced } : null,
     };
   }
 
@@ -1782,11 +1830,6 @@ if(mobilePreviewBtn){
 })();
 
 loadManual();
-if(manualPlaced){
-  el('manualBtn').classList.add('on'); el('manualBtn').textContent='مفعّل';
-  el('manualResetBtn').style.display='';
-  manualMode=true;
-}
 updateStrip();
 render();
 initCrosshair();

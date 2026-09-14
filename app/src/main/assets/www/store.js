@@ -3,8 +3,10 @@
    ──────────────────────────────────────────────────────────────
    Nothing is ever lost when the app closes, however it closes.
 
-     • the current project is written back on every change (debounced)
+     • settings and images are written back on every change (debounced)
        and restored on launch
+     • a hand-made arrangement is NOT — that is deliberate, throwaway work
+       and only a named copy keeps it
      • every movement goes on an undo/redo stack that is itself saved,
        so undo still works after a restart
      • projects can be saved under a name and reopened later
@@ -164,13 +166,28 @@
 
   /* ── Autosave ─────────────────────────────────────────────── */
 
+  /**
+   * The full picture, hand-made arrangement included. Used for undo within
+   * this session and for a named copy the user asks to keep.
+   */
   function snapshot() {
     var A = app();
     return A ? A.captureState({ light: true }) : null;
   }
 
+  /**
+   * What the autosave keeps: settings and images, but not a hand-made
+   * arrangement. Moving pieces around is deliberate, throwaway work — it
+   * should not come back on its own next time the app opens. Saving a named
+   * copy is what makes an arrangement stick.
+   */
+  function autoSnapshot() {
+    var A = app();
+    return A ? A.captureState({ light: true, includeManual: false }) : null;
+  }
+
   function writeCurrent() {
-    var st = snapshot();
+    var st = autoSnapshot();
     if (!st) return Promise.resolve();
     st.savedAt = Date.now();
     return syncBlobs().then(function () { return put(STORE, CURRENT_KEY, st); });
@@ -215,12 +232,27 @@
    * photos by id, so this stays small; it is debounced anyway because a busy
    * editing session pushes entries faster than it is worth writing them.
    */
+  /** Undo entries survive a restart, but without the arrangement either. */
+  function strip(entry) {
+    var st = entry.state || {};
+    var copy = {};
+    for (var k in st) if (k !== 'manual') copy[k] = st[k];
+    copy.manual = null;
+    if (copy.flags) {
+      var f = {};
+      for (var g in copy.flags) f[g] = copy.flags[g];
+      f.manualMode = false;
+      copy.flags = f;
+    }
+    return { label: entry.label, state: copy };
+  }
+
   function persistHistory() {
     clearTimeout(histTimer);
     histTimer = setTimeout(function () {
       put(META, HISTORY_KEY, {
-        past: history.past.slice(-40),
-        future: history.future.slice(0, 40),
+        past: history.past.slice(-40).map(strip),
+        future: history.future.slice(0, 40).map(strip),
       });
     }, 400);
   }
@@ -260,6 +292,7 @@
 
   function projectKey(name) { return 'p:' + name; }
 
+  /** A named copy is the one place a hand-made arrangement is kept. */
   function saveProject(name) {
     var st = snapshot();
     if (!st) return Promise.resolve(false);

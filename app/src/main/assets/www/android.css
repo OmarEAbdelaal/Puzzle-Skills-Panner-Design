@@ -310,3 +310,31 @@ body.in-app .progress-bar{
   font-size: 12px; color: var(--muted);
   padding: 10px 2px 14px; text-align: center;
 }
+
+
+/* ══ Per-image rotate button in the strip ════════════════════
+   Sits opposite the delete button. When on, it is filled in and the
+   thumbnail itself is shown turned, so the strip matches the banner.
+   ══════════════════════════════════════════════════════════════ */
+.rot-btn{
+  position: absolute;
+  left: 3px;          /* physical: the page is RTL and ✕ holds the right */
+  top: 3px;
+  width: 22px; height: 22px;
+  border-radius: 7px;
+  border: 1.5px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 13px; line-height: 1;
+  font-family: "Fredoka", sans-serif;
+  cursor: pointer; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  opacity: .85;
+}
+.rot-btn:hover{ border-color: var(--blue); color: var(--blue); opacity: 1; }
+.rot-btn.on{
+  background: var(--blue); border-color: var(--blue); color: #fff; opacity: 1;
+}
+.thumb-img.thumb-rot{ transform: rotate(90deg) scale(.72); }
+
+body.in-app .rot-btn{ width: 28px; height: 28px; font-size: 15px; }
