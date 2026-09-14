@@ -69,11 +69,14 @@ object ApkInstaller {
             }
 
             val sessionId = installer.createSession(params)
-            session = installer.openSession(sessionId)
+            // Held in a non-null local as well: `session` is reassigned below,
+            // and Kotlin will not smart-cast a var that a closure captures.
+            val open = installer.openSession(sessionId)
+            session = open
 
-            session.openWrite("panner", 0, apk.length()).use { out ->
+            open.openWrite("panner", 0, apk.length()).use { out ->
                 apk.inputStream().use { input -> input.copyTo(out, 256 * 1024) }
-                session.fsync(out)
+                open.fsync(out)
             }
 
             val intent = Intent(ACTION_INSTALL_STATUS)
@@ -85,8 +88,8 @@ object ApkInstaller {
             }
             val pending = PendingIntent.getBroadcast(context, sessionId, intent, flags)
 
-            session.commit(pending.intentSender)
-            session.close()
+            open.commit(pending.intentSender)
+            open.close()
             session = null
         } catch (e: Exception) {
             Log.e(TAG, "install session failed", e)
