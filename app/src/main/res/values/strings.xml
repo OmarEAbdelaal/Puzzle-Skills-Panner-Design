@@ -15,4 +15,6 @@
     <string name="share_export">Share banner</string>
     <string name="exports_location">Exports are saved to %1$s</string>
     <string name="no_images_picked">No images selected.</string>
+    <string name="update_file_missing">The downloaded update is missing or empty.</string>
+    <string name="update_install_failed">Could not start the update install.</string>
 </resources>

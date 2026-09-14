@@ -83,7 +83,10 @@ android {
             signingConfig = signingConfigs.findByName("release")
         }
         debug {
-            applicationIdSuffix = ".debug"
+            // No applicationIdSuffix on purpose. Nobody runs a debug and a
+            // release copy side by side here, and a suffix would mean the day
+            // a signing key is configured the signed build arrives as a second,
+            // separate app instead of updating the one already installed.
             versionNameSuffix = "-debug"
         }
     }

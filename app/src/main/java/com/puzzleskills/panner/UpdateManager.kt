@@ -12,7 +12,6 @@ import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -252,9 +251,15 @@ class UpdateManager(
     }
 
     /**
-     * Hands the APK to the package installer. On Android 8+ the user must first
-     * allow this app to install unknown apps; if they haven't, we send them to
-     * exactly that settings screen rather than failing silently.
+     * Applies the update.
+     *
+     * Goes through [ApkInstaller], which uses an install session rather than an
+     * ACTION_VIEW intent so the app can update itself with as little ceremony as
+     * the platform allows, and can come back up afterwards.
+     *
+     * On Android 8+ the user must first allow this app to install unknown apps;
+     * if they haven't, we send them to exactly that settings screen rather than
+     * failing silently.
      */
     fun install(apk: File) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
@@ -264,18 +269,8 @@ class UpdateManager(
             openUnknownSourcesSettings()
             return
         }
-        val uri = FileProvider.getUriForFile(
-            context, "${BuildConfig.APPLICATION_ID}.fileprovider", apk
-        )
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        try {
-            context.startActivity(intent)
-        } catch (e: ActivityNotFoundException) {
-            Log.e(TAG, "no installer available", e)
+        ApkInstaller.install(context, apk) { reason ->
+            Log.e(TAG, "install failed: $reason")
             reportInstallFailure()
         }
     }

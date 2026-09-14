@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <!-- Where downloaded update APKs land, so FileProvider can hand them
-         to the system package installer. -->
+    <!-- Where downloaded update APKs land. The installer reads them through
+         an install session now, but keep these roots: they cost nothing and
+         a share of a file from here would otherwise fail. -->
     <external-files-path name="updates" path="." />
     <files-path name="internal_updates" path="." />
 

@@ -15,4 +15,6 @@
     <string name="share_export">مشاركة البانر</string>
     <string name="exports_location">تُحفظ التصديرات في %1$s</string>
     <string name="no_images_picked">لم يتم اختيار أي صور.</string>
+    <string name="update_file_missing">ملف التحديث غير موجود أو فارغ.</string>
+    <string name="update_install_failed">تعذّر بدء تثبيت التحديث.</string>
 </resources>

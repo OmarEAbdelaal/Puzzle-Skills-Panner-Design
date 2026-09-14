@@ -42,7 +42,20 @@
             </intent-filter>
         </activity>
 
-        <!-- Hands the downloaded APK to the package installer -->
+        <!-- Receives the outcome of a self-update install session. Declared
+             here rather than registered at runtime because applying the update
+             kills this process, so the result must reach a fresh one. -->
+        <receiver
+            android:name=".InstallResultReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.puzzleskills.panner.INSTALL_STATUS" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Shares an exported banner on Android 9 and older, where the
+             export is a plain file rather than a MediaStore entry. Updates no
+             longer go through here — they use an install session instead. -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
