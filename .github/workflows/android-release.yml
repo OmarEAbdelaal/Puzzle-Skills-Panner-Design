@@ -105,16 +105,41 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
+
+          # Report which of the four secrets actually arrived, without ever
+          # printing a value. When signing silently falls back to a throwaway
+          # key, this is the difference between guessing and knowing.
+          echo "### Signing secrets seen by this run" >> "$GITHUB_STEP_SUMMARY"
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            case "$name" in
+              ANDROID_KEYSTORE_BASE64)   value="${KEYSTORE_BASE64}" ;;
+              ANDROID_KEYSTORE_PASSWORD) value="${KEYSTORE_PASSWORD}" ;;
+              ANDROID_KEY_ALIAS)         value="${KEY_ALIAS}" ;;
+              ANDROID_KEY_PASSWORD)      value="${KEY_PASSWORD}" ;;
+            esac
+            if [[ -n "$value" ]]; then
+              echo "- \`$name\` — set (${#value} characters)" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "- \`$name\` — **MISSING**" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
           if [[ -z "${KEYSTORE_BASE64}" ]]; then
             echo "signed=false" >> "$GITHUB_OUTPUT"
-            echo "::warning title=No signing key::ANDROID_KEYSTORE_BASE64 is not set. Building a debug-signed APK — it installs, but in-app updates will ask you to uninstall first. See docs/SIGNING.md."
+            echo "::warning title=No signing key::ANDROID_KEYSTORE_BASE64 is empty in this run. Check it is a *repository* secret under Settings → Secrets and variables → Actions (not Dependabot or Codespaces), and that the name matches exactly."
             exit 0
           fi
-          echo "${KEYSTORE_BASE64}" | base64 -d > release.jks
+          echo "${KEYSTORE_BASE64}" | base64 -d > release.jks 2>/dev/null || true
           if [[ ! -s release.jks ]]; then
-            echo "::error title=Bad signing key::ANDROID_KEYSTORE_BASE64 did not decode to a keystore."
+            echo "::error title=Bad signing key::ANDROID_KEYSTORE_BASE64 did not decode to a keystore. It must be the single-line output of 'base64 -w0', with no spaces or line breaks."
             exit 1
           fi
+          # Prove the key opens with the given password before spending a build on it.
+          if ! keytool -list -keystore release.jks -storepass "${KEYSTORE_PASSWORD}" -alias "${KEY_ALIAS}" >/dev/null 2>&1; then
+            echo "::error title=Signing key unusable::The keystore decoded, but it will not open with ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_ALIAS. Check both secrets."
+            exit 1
+          fi
+          echo "Signing key verified: alias '${KEY_ALIAS}' opens correctly." >> "$GITHUB_STEP_SUMMARY"
           {
             echo "storeFile=release.jks"
             echo "storePassword=${KEYSTORE_PASSWORD}"
