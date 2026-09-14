@@ -131,9 +131,20 @@ jobs:
             echo "::warning title=No signing key::ANDROID_KEYSTORE_BASE64 is empty in this run. Check it is a *repository* secret under Settings → Secrets and variables → Actions (not Dependabot or Codespaces), and that the name matches exactly."
             exit 0
           fi
-          echo "${KEYSTORE_BASE64}" | base64 -d > release.jks 2>/dev/null || true
+          # Tolerate a value that arrived wrapped across lines: editors and
+          # copy-paste add line breaks, and base64 does not care about them.
+          CLEANED="$(printf '%s' "${KEYSTORE_BASE64}" | tr -d '[:space:]')"
+          printf '%s' "$CLEANED" | base64 -d > release.jks 2>/dev/null || true
+
           if [[ ! -s release.jks ]]; then
-            echo "::error title=Bad signing key::ANDROID_KEYSTORE_BASE64 did not decode to a keystore. It must be the single-line output of 'base64 -w0', with no spaces or line breaks."
+            echo "Received ${#CLEANED} characters after removing whitespace." >> "$GITHUB_STEP_SUMMARY"
+            if [[ ${#CLEANED} -lt 500 ]]; then
+              # Far too short to be a keystore — almost always the file's path
+              # or name was pasted instead of the text inside it.
+              echo "::error title=Bad signing key::ANDROID_KEYSTORE_BASE64 holds only ${#CLEANED} characters. A keystore is thousands. This is usually the FILE PATH pasted instead of the file's CONTENTS — open keystore.base64.txt in a plain text editor, select all, copy, and paste that."
+            else
+              echo "::error title=Bad signing key::ANDROID_KEYSTORE_BASE64 (${#CLEANED} characters) is not valid base64. Re-copy the whole of keystore.base64.txt."
+            fi
             exit 1
           fi
           # Prove the key opens with the given password before spending a build on it.
