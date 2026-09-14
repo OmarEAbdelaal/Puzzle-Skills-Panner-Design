@@ -119,8 +119,10 @@ jobs:
             esac
             if [[ -n "$value" ]]; then
               echo "- \`$name\` — set (${#value} characters)" >> "$GITHUB_STEP_SUMMARY"
+              echo "SIGNING-SECRET $name = set (${#value} characters)"
             else
               echo "- \`$name\` — **MISSING**" >> "$GITHUB_STEP_SUMMARY"
+              echo "SIGNING-SECRET $name = MISSING"
             fi
           done
 
