@@ -256,11 +256,25 @@ jobs:
         run: |
           set -euo pipefail
           TAG="v${{ steps.version.outputs.name }}"
+          APK="${{ steps.apk.outputs.path }}"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "${{ steps.apk.outputs.path }}" --clobber
+            gh release upload "$TAG" "$APK" --clobber
             gh release edit "$TAG" --notes-file release-notes.md
+            # Leave exactly one APK on the tag. The in-app updater downloads the
+            # first .apk asset it finds, so an APK left over from an earlier run
+            # of this tag — a debug-signed one especially — can be handed out as
+            # the update and then refused by Android for a signature mismatch.
+            KEEP=$(basename "$APK")
+            gh release view "$TAG" --json assets \
+              --jq '.assets[].name | select(endswith(".apk"))' \
+            | while read -r NAME; do
+                if [[ "$NAME" != "$KEEP" ]]; then
+                  echo "Removing stale asset: $NAME"
+                  gh release delete-asset "$TAG" "$NAME" --yes
+                fi
+              done
           else
-            gh release create "$TAG" "${{ steps.apk.outputs.path }}" \
+            gh release create "$TAG" "$APK" \
               --title "Puzzle Skills Panner $TAG" \
               --notes-file release-notes.md \
               --target "${{ github.sha }}"
