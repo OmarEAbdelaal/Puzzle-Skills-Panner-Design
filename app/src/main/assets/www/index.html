@@ -1535,25 +1535,51 @@ async function exportPNG(){
     alert(`عرض القماش كبير جداً على المتصفح عند ${dpi} DPI (${CW} بكسل).\nقلّل عرض القماش أو الدقة قليلاً.`);
     btn.disabled=false;btn.textContent='⬇ تصدير PNG';bar.style.display='none';fill.style.width='0%';return;
   }
-  // Boundary-aware band splitting: snap each cut DOWN to a line that
-  // crosses no image, so bands never cut a drawing in half.
-  const rects=placed.map(p=>{ const t=Math.round(p.y*pxCm); return {t, b:t+Math.round(p.h*pxCm)}; });
-  const cleanCut=(L)=>{ let C=Math.min(L,CH),moved=true;
-    while(moved){ moved=false; for(const r of rects){ if(r.t<C && C<r.b){ C=r.b; moved=true; } } }
-    return Math.min(C,CH); };
-  const targetH=Math.max(1,Math.floor(bandH*0.9)); // leave headroom for snap-down
-  const bounds=[0]; let cur=0, guard=0;
+  // Band splitting, on the seams between photos.
+  //
+  // Each band is its own PNG, so a cut landing inside a photo splits that
+  // photo across two files. Cuts are therefore placed only on a line no photo
+  // crosses, and — the part that matters — never further down than `bandH`,
+  // the tallest canvas the browser will actually allocate.
+  //
+  // Searching FORWARD for a clean line, as this used to, breaks exactly that
+  // second rule: to clear a tall photo it happily returns a cut beyond the
+  // limit. The browser does not refuse such a canvas, it quietly hands back a
+  // clamped one, so the band is drawn short — the photo is cut in half after
+  // all AND the strip between the clamp and the next band's start is missing
+  // from every file. Searching BACKWARD from the limit cannot do that: the
+  // worst case is one more file, not lost banner.
+  const rects=placed.map(p=>{ const t=Math.round(p.y*pxCm); return {t, b:t+Math.round(p.h*pxCm)}; })
+                    .filter(r=>r.b>r.t);
+  const crosses=(C)=>rects.some(r=>r.t<C && C<r.b);
+  // Every line a photo starts or ends on is a candidate seam.
+  const seams=[...new Set(rects.flatMap(r=>[r.t,r.b]))].sort((a,b)=>a-b);
+
+  const bounds=[0]; let cur=0, forced=0, guard=0;
   while(cur<CH && guard++<20000){
-    const target=cur+targetH;
-    if(target>=CH){ bounds.push(CH); break; }
-    let C=cleanCut(target);
-    if(C<=cur){ // an image taller than a band straddles — jump to its bottom
-      let nb=CH; for(const r of rects) if(r.b>cur && r.b<nb) nb=r.b; C=nb;
-    }
+    if(CH-cur<=bandH){ bounds.push(CH); break; }   // the rest fits in one file
+    const limit=cur+bandH;
+    // The limit itself is the lowest cut possible, so take it when it is
+    // clear of every photo (bare felt); otherwise drop back to the last seam
+    // that still fits, which keeps the file count as low as it can be.
+    let C = crosses(limit) ? 0 : limit;
+    if(!C) for(const s of seams) if(s>cur && s<=limit && s>C && !crosses(s)) C=s;
+    if(!C){ C=limit; forced++; }   // one photo taller than a whole band: no choice
     bounds.push(C); cur=C;
   }
   if(bounds[bounds.length-1]!==CH) bounds.push(CH);
   const nBands=bounds.length-1;
+
+  // Ask before cutting a photo, not after. The export takes minutes at print
+  // resolution, and the answer here is almost always "lower the DPI" — which
+  // is no use once the files are already in the gallery.
+  if(forced>0){
+    const maxCm=Math.floor(bandH/pxCm);
+    const go=confirm(`⚠️ لا يمكن إبقاء كل الصور كاملة عند ${dpi} DPI.\n\nأقصى ارتفاع للملف الواحد هو ${maxCm} سم عند هذه الدقة، وهناك صورة أطول من ذلك — لذا ستُقص ${forced} صورة عبر ملفين.\n\nالحل: ألغِ الآن، ثم قلّل الدقة أو قسّم الصورة الطويلة إلى أجزاء أصغر من ${maxCm} سم.\n\nهل تريد المتابعة والقص رغم ذلك؟`);
+    if(!go){
+      btn.disabled=false;btn.textContent='⬇ تصدير PNG';bar.style.display='none';fill.style.width='0%';return;
+    }
+  }
 
   const drawInto=(ctx,offY,bH)=>{
     ctx.fillStyle=feltColor; ctx.fillRect(0,0,CW,bH);
@@ -1614,7 +1640,13 @@ async function exportPNG(){
     await new Promise(r=>setTimeout(r,250)); // let each download start
   }
   fill.style.width='100%';
-  if(nBands>1) setTimeout(()=>alert(`المقاس أكبر من حد المتصفح، فتم تصديره كـ ${nBands} ملفات PNG بكامل دقة ${dpi} DPI — والقص تم على حدود الصور (لا توجد أي صورة مقطوعة). الشرائط أفقية متتابعة من أعلى لأسفل، اطبعها ووصّلها بالترتيب.`),300);
+  if(nBands>1){
+    // Only ever claim a clean split when every cut really did land on a seam.
+    const msg = forced===0
+      ? `المقاس أكبر من حد المتصفح، فتم تصديره كـ ${nBands} ملفات PNG بكامل دقة ${dpi} DPI — والقص تم على الفواصل بين الصور (لا توجد أي صورة مقطوعة). الشرائط أفقية متتابعة من أعلى لأسفل، اطبعها ووصّلها بالترتيب.`
+      : `تم التصدير كـ ${nBands} ملفات PNG بدقة ${dpi} DPI، مع قص ${forced} صورة كما وافقت. الشرائط أفقية متتابعة من أعلى لأسفل، اطبعها ووصّلها بالترتيب.`;
+    setTimeout(()=>alert(msg),300);
+  }
   setTimeout(()=>{btn.disabled=false;btn.textContent='⬇ تصدير PNG';bar.style.display='none';fill.style.width='0%';},1200);
 }
 el('exportBtn').addEventListener('click',exportPNG);
